@@ -36,6 +36,42 @@
       "artifacts": [
         "Dummy"
       ]
+    },
+    "/home/nandita/Documents/onchain-subscription/contracts/OnchainSubscription.sol": {
+      "lastModificationDate": 1769798477853,
+      "contentHash": "cbdc2516fe47b3f1ae469214c022e32e",
+      "sourceName": "contracts/OnchainSubscription.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "OnchainSubscription"
+      ]
     }
   }
 }

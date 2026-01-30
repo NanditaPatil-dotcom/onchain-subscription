@@ -6,20 +6,20 @@ async function main() {
   console.log("Starting deployment...");
 
   // Get contract factory
-  const Dummy = await ethers.getContractFactory("Dummy");
-  console.log("Contract factory loaded");
+  const OnchainSubscription = await ethers.getContractFactory("OnchainSubscription");
+  console.log("OnchainSubscription factory loaded");
 
   // Deploy contract
-  const dummy = await Dummy.deploy();
+  const onchainSubscription = await OnchainSubscription.deploy();
   console.log("Deployment transaction sent, waiting for confirmation...");
 
   // Wait for deployment to complete
-  await dummy.waitForDeployment();
+  await onchainSubscription.waitForDeployment();
   console.log("Deployment confirmed!");
 
   // Get deployed address
-  const address = await dummy.getAddress();
-  console.log("Dummy deployed to:", address);
+  const address = await onchainSubscription.getAddress();
+  console.log("OnchainSubscription deployed to:", address);
 }
 
 main()
