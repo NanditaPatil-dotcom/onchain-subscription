@@ -1,7 +1,2 @@
-# Sample Hardhat 3 Beta Project (minimal)
+<img width="1201" height="656" alt="image" src="https://github.com/user-attachments/assets/ec839718-9580-4877-8851-5ff14a049610" />
 
-This project has a minimal setup of Hardhat 3 Beta, without any plugins.
-
-## What's included?
-
-The project includes native support for TypeScript, Hardhat scripts, tasks, and support for Solidity compilation and tests.
