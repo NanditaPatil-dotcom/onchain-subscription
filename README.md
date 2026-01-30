@@ -1,3 +1,7 @@
-# onchain-subscription
-Subscriptions on Ethereum that renew only with cryptographic user consent.
-<img width="1117" height="612" alt="image" src="https://github.com/user-attachments/assets/bf11207a-65b2-4147-aaa3-b78f6c9e15d1" />
+# Sample Hardhat 3 Beta Project (minimal)
+
+This project has a minimal setup of Hardhat 3 Beta, without any plugins.
+
+## What's included?
+
+The project includes native support for TypeScript, Hardhat scripts, tasks, and support for Solidity compilation and tests.
