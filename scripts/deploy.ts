@@ -13,12 +13,12 @@ async function main() {
   const onchainSubscription = await OnchainSubscription.deploy();
   console.log("Deployment transaction sent, waiting for confirmation...");
 
-  // Wait for deployment to complete
-  await onchainSubscription.waitForDeployment();
+  // Wait for deployment to complete (ethers v5 syntax)
+  await onchainSubscription.deployed();
   console.log("Deployment confirmed!");
 
   // Get deployed address
-  const address = await onchainSubscription.getAddress();
+  const address = onchainSubscription.address;
   console.log("OnchainSubscription deployed to:", address);
 }
 

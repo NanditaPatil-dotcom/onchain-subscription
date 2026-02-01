@@ -38,8 +38,8 @@
       ]
     },
     "/home/nandita/Documents/onchain-subscription/contracts/OnchainSubscription.sol": {
-      "lastModificationDate": 1769798477853,
-      "contentHash": "cbdc2516fe47b3f1ae469214c022e32e",
+      "lastModificationDate": 1769959005251,
+      "contentHash": "835ace9261437ecd911ee97de5d63828",
       "sourceName": "contracts/OnchainSubscription.sol",
       "solcConfig": {
         "version": "0.8.20",
