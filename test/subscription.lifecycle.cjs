@@ -57,8 +57,57 @@ describe("OnchainSubscription – Phase 2 lifecycle", function () {
       { value: ethers.utils.parseEther("0.1") }
     );
 
+    // Use the new claimPayment signature with valid signature params
+    const expiry = Math.floor(Date.now() / 1000) + 300;
+
+    // Sign with a wrong signer to trigger a different error, but the payment period check comes first
+    const signature = await signApproval({
+      signer: user,
+      subscriptionId: 0,
+      amount: ethers.utils.parseEther("0.01"),
+      nonce: 0,
+      expiry,
+    });
+
     await expect(
-      contract.connect(service).claimPayment(0, "0x")
+      contract.connect(service).claimPayment(
+        0,
+        ethers.utils.parseEther("0.01"),
+        0,
+        expiry,
+        signature
+      )
     ).to.be.rejectedWith("Payment not due yet");
   });
+
+  async function signApproval({
+    signer,
+    subscriptionId,
+    amount,
+    nonce,
+    expiry,
+  }) {
+    const domain = {
+      name: "OnchainSubscription",
+      version: "1",
+      chainId: 31337, // hardhat local
+      verifyingContract: contract.address,
+    };
+
+    const types = {
+      PaymentApproval: [
+        { name: "subscriptionId", type: "uint256" },
+        { name: "amount", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "expiry", type: "uint256" },
+      ],
+    };
+
+    return signer._signTypedData(domain, types, {
+      subscriptionId,
+      amount,
+      nonce,
+      expiry,
+    });
+  }
 });

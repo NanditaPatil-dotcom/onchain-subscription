@@ -1,0 +1,70 @@
+"use client";
+
+import { ethers } from "ethers";
+import { CONTRACT_ADDRESS, ABI } from "../lib/contracts";
+
+export default function SignPaymentButton({
+  subscriptionId,
+  amount,
+  nonce,
+}: {
+  subscriptionId: number;
+  amount: string; // in ETH
+  nonce: number;
+}) {
+  async function signAndPay() {
+    if (!window.ethereum) return alert("Wallet not found");
+
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+
+    const expiry = Math.floor(Date.now() / 1000) + 60 * 5; // 5 minutes
+
+    const domain = {
+      name: "OnchainSubscription",
+      version: "1",
+      chainId: 11155111, // Sepolia
+      verifyingContract: CONTRACT_ADDRESS,
+    };
+
+    const types = {
+      PaymentApproval: [
+        { name: "subscriptionId", type: "uint256" },
+        { name: "amount", type: "uint256" },
+        { name: "nonce", type: "uint256" },
+        { name: "expiry", type: "uint256" },
+      ],
+    };
+
+    const value = {
+      subscriptionId,
+      amount: ethers.utils.parseEther(amount),
+      nonce,
+      expiry,
+    };
+
+    // 🔐 USER SIGNS HERE (NO GAS)
+    const signature = await signer._signTypedData(domain, types, value);
+
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESS,
+      ABI,
+      signer
+    );
+
+    // SERVICE CLAIMS PAYMENT
+    await contract.claimPayment(
+      subscriptionId,
+      value.amount,
+      nonce,
+      expiry,
+      signature
+    );
+  }
+
+  return (
+    <button onClick={signAndPay}>
+      Approve & Pay
+    </button>
+  );
+}
