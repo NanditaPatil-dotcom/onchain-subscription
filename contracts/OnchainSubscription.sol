@@ -82,6 +82,31 @@ contract OnchainSubscription is EIP712{
     });
     }
 
+    function createTokenSubscription(
+    address service,
+    address token,
+    uint256 amount,
+    uint256 period
+) external {
+    require(service != address(0), "Invalid service");
+    require(token != address(0), "Invalid token");
+
+    uint256 id = nextSubscriptionId++;
+
+    subscriptions[id] = Subscription({
+        subscriber: msg.sender,
+        service: service,
+        token: token,
+        amount: amount,
+        period: period,
+        lastPaid: block.timestamp,
+        nonce: 0,
+        balance: 0,
+        active: true
+    });
+}
+
+
 
     /// @notice Cancels an active subscription
     /// @param subscriptionId The ID of the subscription to cancel
@@ -142,6 +167,10 @@ contract OnchainSubscription is EIP712{
         require(ok, "ETH Payment failed");
     }
 
+    function _getPermit2() internal view virtual returns (address) {
+    return PERMIT2;
+   }
+
     function claimPaymentWithPermit2(
         uint256 subscriptionId,
         IPermit2.PermitTransferFrom calldata permit,
@@ -160,7 +189,7 @@ contract OnchainSubscription is EIP712{
         sub.lastPaid = block.timestamp;
 
         // interaction (Permit2 pulls tokens directly)
-        IPermit2(PERMIT2).permitTransferFrom(
+        IPermit2(_getPermit2()).permitTransferFrom(
             permit,
             transferDetails,
             sub.subscriber,
