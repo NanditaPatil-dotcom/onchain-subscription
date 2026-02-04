@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 
 type ApprovePaymentModalProps = {
   open: boolean
@@ -56,61 +57,76 @@ export default function ApprovePaymentModal({
 
   const countdown = useMemo(() => formatSeconds(remaining), [remaining])
 
-  if (typeof window === 'undefined' || !open) return null
+  if (typeof window === 'undefined') return null
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-200"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="approve-payment-title"
-    >
-      <div
-        className="relative w-full max-w-md p-[1px] rounded-2xl bg-purple-500 shadow-[0_25px_80px_-40px_rgba(0,0,0,0.9)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="rounded-2xl bg-slate-950/80 backdrop-blur-xl p-6 border border-white/10">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                Permit2 Signature
-              </p>
-              <h2
-                id="approve-payment-title"
-                className="text-xl font-semibold text-white"
-              >
-                Approve Subscription Payment
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              aria-label="Close modal"
-              className="text-slate-300 hover:text-white transition"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <InfoBlock label="Amount" value={`${formatter.format(Number(amount))} ${token}`} />
-            <InfoBlock label="Token" value={token} />
-            <InfoBlock label="Nonce" value={`#${nonce}`} />
-            <InfoBlock label="Expires in" value={countdown} emphasize />
-          </div>
-
-          <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
-            This signature is single-use and expires automatically.
-          </div>
-
-          <button
-            onClick={onSign}
-            className="mt-5 w-full rounded-xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_15px_40px_rgba(88,28,135,0.4)] transition hover:shadow-[0_18px_50px_rgba(56,189,248,0.35)] active:translate-y-[1px]"
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="approve-payment-title"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="relative w-full max-w-md p-[1px] rounded-2xl bg-purple-500 shadow-[0_25px_80px_-40px_rgba(0,0,0,0.9)]"
+            onClick={(e) => e.stopPropagation()}
           >
-            Sign Message (No Gas)
-          </button>
-        </div>
-      </div>
-    </div>,
+            <div className="rounded-2xl bg-slate-950/80 backdrop-blur-xl p-6 border border-white/10">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                    Permit2 Signature
+                  </p>
+                  <h2
+                    id="approve-payment-title"
+                    className="text-xl font-semibold text-white"
+                  >
+                    Approve Subscription Payment
+                  </h2>
+                </div>
+                <button
+                  onClick={onClose}
+                  aria-label="Close modal"
+                  className="text-slate-300 hover:text-white transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <InfoBlock label="Amount" value={`${formatter.format(Number(amount))} ${token}`} />
+                <InfoBlock label="Token" value={token} />
+                <InfoBlock label="Nonce" value={`#${nonce}`} />
+                <InfoBlock label="Expires in" value={countdown} emphasize />
+              </div>
+
+              <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
+                This signature is single-use and expires automatically.
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
+                onClick={onSign}
+                className="mt-5 w-full rounded-xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_15px_40px_rgba(88,28,135,0.4)] transition hover:shadow-[0_18px_50px_rgba(56,189,248,0.35)] active:translate-y-[1px]"
+              >
+                Sign Message (No Gas)
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   )
 }
