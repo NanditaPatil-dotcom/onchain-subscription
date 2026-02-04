@@ -115,7 +115,7 @@ export default function ApprovePaymentModal({
               </div>
 
               <motion.button
-                whileHover={{ scale: 1.01 }}
+                whileHover={{ scale: 1.02, boxShadow: '0 12px 32px rgba(94,234,212,0.35)' }}
                 transition={{ duration: 0.12, ease: 'easeOut' }}
                 onClick={onSign}
                 className="mt-5 w-full rounded-xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_15px_40px_rgba(88,28,135,0.4)] transition hover:shadow-[0_18px_50px_rgba(56,189,248,0.35)] active:translate-y-[1px]"

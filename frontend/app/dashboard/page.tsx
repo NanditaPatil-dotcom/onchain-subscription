@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import ApprovePaymentModal from '@/components/ApprovePaymentModal'
 
 type StatCard = {
@@ -50,7 +51,12 @@ export default function DashboardPage() {
         <div className="absolute inset-x-10 bottom-0 h-64 rounded-[32px] bg-gradient-to-r from-purple-700/25 via-blue-700/15 to-emerald-500/20 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-10">
+      <motion.div
+        className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-10"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+      >
         <Header />
 
         <section className="grid gap-4 md:grid-cols-3">
@@ -84,9 +90,12 @@ export default function DashboardPage() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {subscriptions.map((sub) => (
-              <article
+              <motion.article
                 key={sub.service}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-5 shadow-[0_25px_70px_-35px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition hover:-translate-y-1 hover:border-white/20"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,58,237,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(16,185,129,0.15),transparent_30%)] opacity-70" />
                 <div className="relative flex items-center justify-between">
@@ -108,8 +117,10 @@ export default function DashboardPage() {
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[sub.status]}`}>
                     {sub.status}
                   </span>
-                  <button
+                  <motion.button
                     type="button"
+                    whileHover={{ scale: 1.02, boxShadow: '0 12px 30px rgba(59,130,246,0.35)' }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
                     className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)] transition hover:shadow-[0_15px_40px_rgba(59,130,246,0.35)]"
                     disabled={sub.status === 'Paid'}
                     aria-disabled={sub.status === 'Paid'}
@@ -131,14 +142,14 @@ export default function DashboardPage() {
                       <path d="M5 12h14" />
                       <path d="m13 6 6 6-6 6" />
                     </svg>
-                  </button>
+                  </motion.button>
                 </div>
 
                 <div className="relative mt-4 h-px w-full bg-gradient-to-r from-white/5 via-white/20 to-white/5" />
                 <p className="relative mt-3 text-xs text-slate-400">
                   Secure, non-custodial approvals routed through your escrow.
                 </p>
-              </article>
+              </motion.article>
             ))}
           </div>
         </section>
@@ -151,7 +162,7 @@ export default function DashboardPage() {
           nonce={selected ? Math.floor(Math.random() * 10000) : 0}
           expiry={300}
         />
-      </div>
+      </motion.div>
     </div>
   )
 }

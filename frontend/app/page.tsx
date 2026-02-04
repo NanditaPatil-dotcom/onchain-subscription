@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { Navbar } from '@/components/navbar'
 import { Hero } from '@/components/hero'
 import { Stats } from '@/components/stats'
@@ -43,19 +44,26 @@ export default function Home() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10">
+      <motion.div
+        className="relative z-10"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+      >
         <Navbar />
         <Hero />
         <Stats />
-      </div>
+      </motion.div>
 
       {/* Floating demo trigger for Approve modal */}
-      <button
+      <motion.button
         onClick={() => setShowApprove(true)}
         className="fixed bottom-6 right-6 z-20 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/30 backdrop-blur transition hover:border-white/30 hover:bg-white/15"
+        whileHover={{ scale: 1.03, boxShadow: '0 10px 30px rgba(124,58,237,0.35)' }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
       >
         Demo Approve
-      </button>
+      </motion.button>
 
       <ApprovePaymentModal
         open={showApprove}
