@@ -44,6 +44,7 @@ export default function Home() {
         <Hero />
         <Stats />
       </div>
+
     </div>
   )
 }

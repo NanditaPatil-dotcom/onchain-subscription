@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export function Hero() {
   return (
     <section className="relative z-10 min-h-screen flex items-center justify-center px-6 py-20">
@@ -19,12 +21,18 @@ export function Hero() {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="px-8 py-4 rounded-full bg-purple-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/40 transition-all duration-300 transform hover:scale-105">
+          <Link
+            href="/dashboard"
+            className="px-8 py-4 rounded-full bg-purple-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/40 transition-all duration-300 transform hover:scale-105 text-center"
+          >
             Launch App
-          </button>
-          <button className="px-8 py-4 rounded-full border border-purple-500/50 bg-purple-500/10 text-purple-200 font-semibold hover:bg-purple-500/20 hover:border-purple-500/70 transition-all duration-300 backdrop-blur-sm">
+          </Link>
+          <Link
+            href="#how-it-works"
+            className="px-8 py-4 rounded-full border border-purple-500/50 bg-purple-500/10 text-purple-200 font-semibold hover:bg-purple-500/20 hover:border-purple-500/70 transition-all duration-300 backdrop-blur-sm text-center"
+          >
             How it works
-          </button>
+          </Link>
         </div>
       </div>
     </section>
