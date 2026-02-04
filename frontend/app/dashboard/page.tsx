@@ -1,5 +1,8 @@
 'use client'
 
+import { useState } from 'react'
+import ApprovePaymentModal from '@/components/ApprovePaymentModal'
+
 type StatCard = {
   label: string
   value: string
@@ -36,6 +39,8 @@ const statusStyles: Record<Subscription['status'], string> = {
 }
 
 export default function DashboardPage() {
+  const [selected, setSelected] = useState<Subscription | null>(null)
+
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
       {/* Ambient gradients */}
@@ -104,9 +109,14 @@ export default function DashboardPage() {
                     {sub.status}
                   </span>
                   <button
-                    className="inline-flex items-center gap-2 rounded-full bg-purple-600  px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)] transition hover:shadow-[0_15px_40px_rgba(59,130,246,0.35)]"
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)] transition hover:shadow-[0_15px_40px_rgba(59,130,246,0.35)]"
                     disabled={sub.status === 'Paid'}
                     aria-disabled={sub.status === 'Paid'}
+                    onClick={() => {
+                      if (sub.status === 'Paid') return
+                      setSelected(sub)
+                    }}
                   >
                     Approve Payment
                     <svg
@@ -132,6 +142,15 @@ export default function DashboardPage() {
             ))}
           </div>
         </section>
+        <ApprovePaymentModal
+          open={!!selected}
+          onClose={() => setSelected(null)}
+          onSign={() => setSelected(null)}
+          amount={selected?.amount ?? '0'}
+          token={selected?.token ?? 'ETH'}
+          nonce={selected ? Math.floor(Math.random() * 10000) : 0}
+          expiry={300}
+        />
       </div>
     </div>
   )

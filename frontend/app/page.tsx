@@ -1,12 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import { Navbar } from '@/components/navbar'
 import { Hero } from '@/components/hero'
 import { Stats } from '@/components/stats'
 import { FloatingOrbs } from '@/components/floating-orbs'
 import LiquidEther from '@/components/liquid-ether'
+import ApprovePaymentModal from '@/components/ApprovePaymentModal'
 
 export default function Home() {
+  const [showApprove, setShowApprove] = useState(false)
+
   return (
     <div className="dark relative min-h-screen overflow-hidden">
       {/* LiquidEther Background */}
@@ -45,6 +49,23 @@ export default function Home() {
         <Stats />
       </div>
 
+      {/* Floating demo trigger for Approve modal */}
+      <button
+        onClick={() => setShowApprove(true)}
+        className="fixed bottom-6 right-6 z-20 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/30 backdrop-blur transition hover:border-white/30 hover:bg-white/15"
+      >
+        Demo Approve
+      </button>
+
+      <ApprovePaymentModal
+        open={showApprove}
+        onClose={() => setShowApprove(false)}
+        onSign={() => setShowApprove(false)}
+        amount="0.12"
+        token="ETH"
+        nonce={12}
+        expiry={300}
+      />
     </div>
   )
 }
