@@ -1,8 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import ApprovePaymentModal from '@/components/ApprovePaymentModal'
+import { getContract, getSigner } from '@/lib/web3'
+import { ethers } from 'ethers'
+import { signApproval } from '@/lib/signature'
+import { signPermit2Transfer } from '@/lib/permit2'
+import { constants } from 'ethers'
 
 type StatCard = {
   label: string
@@ -41,6 +46,73 @@ const statusStyles: Record<Subscription['status'], string> = {
 
 export default function DashboardPage() {
   const [selected, setSelected] = useState<Subscription | null>(null)
+  const [demoSubs, setDemoSubs] = useState<Subscription[]>(subscriptions)
+  const [subs, setSubs] = useState<any[]>([])
+  const [creating, setCreating] = useState(false)
+  const [signature, setSignature] = useState<string | null>(null)
+  const [signingIndex, setSigningIndex] = useState<number | null>(null)
+  const [claiming, setClaiming] = useState(false)
+  const [signing, setSigning] = useState(false)
+  const [expiryTs, setExpiryTs] = useState<number>(0)
+  const [approval, setApproval] = useState<{
+    subscriptionId: number
+    signature: string
+    expiry: number
+    amount: any
+    nonce: any
+    isToken: boolean
+    permit?: any
+  } | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      try {
+        const contract = await getContract()
+        const countBN = await contract.nextSubscriptionId()
+        const count = Number(countBN.toString())
+
+        const data = []
+        for (let i = 0; i < count; i++) {
+          const s = await contract.subscriptions(i)
+          data.push(s)
+        }
+
+        setSubs(data)
+      } catch (err) {
+        console.error('Failed to load subscriptions:', err)
+      }
+    } catch (err) {
+      console.error('Failed to load subscriptions:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function handleCreateSubscription() {
+    if (creating) return
+    const serviceAddress = window.prompt('Service address (0x...)')
+    if (!serviceAddress) return
+
+    setCreating(true)
+    try {
+      const contract = await getContract(true)
+      const tx = await contract.createSubscription(
+        serviceAddress,
+        ethers.utils.parseEther('0.01'),
+        30 * 24 * 60 * 60,
+        { value: ethers.utils.parseEther('0.1') }
+      )
+      await tx.wait()
+      await load()
+    } catch (err) {
+      console.error('Subscription creation failed:', err)
+      window.alert('Subscription creation failed. Check console for details.')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
@@ -83,13 +155,17 @@ export default function DashboardPage() {
                 Manage recurring agreements and approve upcoming payments.
               </p>
             </div>
-            <button className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/20 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/15">
-              New subscription
+            <button
+              onClick={handleCreateSubscription}
+              disabled={creating}
+              className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/20 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/15 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {creating ? 'Creating...' : 'New subscription'}
             </button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {subscriptions.map((sub) => (
+            {demoSubs.map((sub) => (
               <motion.article
                 key={sub.service}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-5 shadow-[0_25px_70px_-35px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition hover:-translate-y-1 hover:border-white/20"
@@ -127,6 +203,12 @@ export default function DashboardPage() {
                     onClick={() => {
                       if (sub.status === 'Paid') return
                       setSelected(sub)
+                      // default to the first on-chain subscription for signing if user launches from the sample card
+                      if (subs.length > 0) {
+                        setSigningIndex(0)
+                      } else {
+                        setSigningIndex(null)
+                      }
                     }}
                   >
                     Approve Payment
@@ -153,18 +235,213 @@ export default function DashboardPage() {
             ))}
           </div>
         </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">On-chain Subscriptions</h3>
+            <p className="text-sm text-slate-400">Live read from contract</p>
+          </div>
+          <div className="mt-4 space-y-3">
+            {subs.length === 0 && (
+              <p className="text-sm text-slate-400">No subscriptions found.</p>
+            )}
+            {subs.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm text-slate-200"
+              >
+                <span className="font-mono text-xs text-slate-300">
+                  #{i} — {s.subscriber ?? 'N/A'}
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-white">
+                    {s.amount ? s.amount.toString() : '0'} {s.token === constants.AddressZero ? 'wei' : 'tokens'}
+                  </span>
+                  <button
+                    className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-white hover:border-white/30 hover:bg-white/15 transition"
+                    disabled={signing}
+                    onClick={() => {
+                      setSelected({
+                        service: 'On-chain',
+                        token: s.token === constants.AddressZero ? 'ETH' : s.token ?? 'TOKEN',
+                        amount: s.amount ? s.amount.toString() : '0',
+                        cadence: 'per period',
+                        status: 'Awaiting Consent',
+                      })
+                      setSigningIndex(i)
+                      setExpiryTs(Math.floor(Date.now() / 1000) + 300)
+                    }}
+                  >
+                    {signing ? 'Signing...' : s.token === constants.AddressZero ? 'Approve (ETH)' : 'Permit2 + Claim'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
         <ApprovePaymentModal
           open={!!selected}
-          onClose={() => setSelected(null)}
-          onSign={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null)
+            setSigningIndex(null)
+          }}
+          onSign={() => {
+            void handleSign()
+          }}
           amount={selected?.amount ?? '0'}
           token={selected?.token ?? 'ETH'}
           nonce={selected ? Math.floor(Math.random() * 10000) : 0}
-          expiry={300}
+          expiry={Math.max(0, expiryTs - Math.floor(Date.now() / 1000)) || 300}
         />
+        {signature && (
+          <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100 space-y-2">
+            <div>
+              Signature ready: <span className="break-all font-mono">{signature}</span>
+            </div>
+            <button
+              disabled={claiming}
+              onClick={() => void handleClaim()}
+              className="rounded-full border border-emerald-400/30 bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-50 hover:border-emerald-300/50 hover:bg-emerald-500/25 transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {claiming ? 'Claiming...' : 'Claim payment'}
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   )
+
+  async function handleSign() {
+    if (signing) return
+    let index = signingIndex
+    if (index === null) {
+      if (subs.length === 0) {
+        window.alert('No on-chain subscription to sign. Create one first.')
+        return
+      }
+      index = 0
+      setSigningIndex(0)
+      setExpiryTs(Math.floor(Date.now() / 1000) + 300)
+    }
+    if (!process.env.NEXT_PUBLIC_CONTRACT_ADDRESS) {
+      window.alert('Missing NEXT_PUBLIC_CONTRACT_ADDRESS in frontend/.env')
+      return
+    }
+    setSigning(true)
+    try {
+      const signer = await getSigner()
+      const sub = subs[index]
+      const subscriptionId = index
+      const amountBN = sub?.amount ? ethers.BigNumber.from(sub.amount) : ethers.constants.Zero
+      const balanceBN = sub?.balance ? ethers.BigNumber.from(sub.balance) : amountBN
+      const payAmount = balanceBN.gt(amountBN) ? amountBN : balanceBN
+      const nonce = sub?.nonce ?? 0
+      const expiry = Math.floor(Date.now() / 1000) + 900 // absolute timestamp (15m window)
+
+      let sig: string
+      if (sub?.token && sub.token !== constants.AddressZero) {
+        // Token subscription: use Permit2 signature
+        const permitSig = await signPermit2Transfer({
+          signer,
+          token: sub.token,
+          amount: payAmount,
+          nonce,
+          deadline: expiry,
+          to: sub.service ?? (await signer.getAddress()),
+          spender: sub.service ?? (await signer.getAddress()),
+        })
+        sig = permitSig.signature
+        // Store permit payload on the sub for later claim
+        setApproval({
+          subscriptionId,
+          signature: permitSig.signature,
+          expiry,
+          amount: payAmount,
+          nonce,
+          isToken: true,
+          permit: permitSig,
+        })
+      } else {
+        // ETH flow: EIP-712 approval
+        sig = await signApproval({
+          signer,
+          subscriptionId,
+          amount: payAmount,
+          nonce,
+          expiry,
+          contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
+        })
+        setApproval({
+          subscriptionId,
+          signature: sig,
+          expiry,
+          amount: payAmount,
+          nonce,
+          isToken: false,
+        })
+      }
+
+      setSignature(sig)
+      setSelected(null)
+    } catch (err) {
+      console.error('Signing failed:', err)
+      window.alert('Signing failed. Check console for details.')
+    } finally {
+      setSigning(false)
+    }
+  }
+
+  async function handleClaim() {
+    if (!approval) {
+      window.alert('Sign first to prepare claim.')
+      return
+    }
+    const {
+      subscriptionId,
+      signature: sig,
+      expiry,
+      amount,
+      nonce,
+      isToken,
+      permit,
+    } = approval
+
+    setClaiming(true)
+    try {
+      const contract = await getContract(true)
+
+      const tx = isToken && permit
+        ? await contract.claimPaymentWithPermit2(
+            subscriptionId,
+            permit.permit,
+            permit.transferDetails,
+            permit.signature
+          )
+        : await contract.claimPayment(
+            subscriptionId,
+            amount,
+            nonce,
+            expiry,
+            sig
+          )
+      await tx.wait()
+      window.alert('Payment claimed on-chain!')
+      await load()
+      setApproval(null)
+      setSignature(null)
+      // Mark demo card as paid for UX feedback
+      setDemoSubs((prev) =>
+        prev.map((s, idx) =>
+          idx === 0 ? { ...s, status: 'Paid' } : s
+        )
+      )
+    } catch (err) {
+      console.error('Claim failed:', err)
+      window.alert('Claim failed. Check console for details.')
+    } finally {
+      setClaiming(false)
+    }
+  }
 }
 
 function Header() {
