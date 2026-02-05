@@ -125,7 +125,7 @@ export default function DashboardPage() {
         return {
           id: sub.id,
           service: meta?.name ?? `Service ${sub.id}`,
-          token: tokenSymbol,
+          token: 'ETH' as const,
           amount: amountFormatted,
           cadence: `${Math.max(1, Math.round(Number(sub.period) / 86400))}-day cycle`,
           status,
@@ -229,7 +229,7 @@ export default function DashboardPage() {
                       if (!sub.due) return
                       setSelected({
                         service: sub.service,
-                        token: sub.token,
+                        token: 'ETH',
                         amount: sub.amount,
                         cadence: sub.cadence,
                         status: sub.status,

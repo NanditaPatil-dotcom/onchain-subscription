@@ -33,7 +33,15 @@ export async function signApproval({
     ],
   };
 
-  return await signer._signTypedData(domain, types, {
+  const typedSigner = signer as unknown as {
+    _signTypedData: (
+      domain: any,
+      types: Record<string, Array<{ name: string; type: string }>>,
+      value: Record<string, any>
+    ) => Promise<string>;
+  };
+
+  return await typedSigner._signTypedData(domain, types, {
     subscriptionId,
     amount,
     nonce,
