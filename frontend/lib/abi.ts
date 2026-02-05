@@ -67,19 +67,6 @@ export const ONCHAIN_SUBSCRIPTION_ABI = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "PERMIT2",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [
       {
         internalType: "uint256",
@@ -128,75 +115,6 @@ export const ONCHAIN_SUBSCRIPTION_ABI = [
   {
     inputs: [
       {
-        internalType: "uint256",
-        name: "subscriptionId",
-        type: "uint256",
-      },
-      {
-        components: [
-          {
-            components: [
-              {
-                internalType: "address",
-                name: "token",
-                type: "address",
-              },
-              {
-                internalType: "uint256",
-                name: "amount",
-                type: "uint256",
-              },
-            ],
-            internalType: "struct IPermit2.TokenPermissions",
-            name: "permitted",
-            type: "tuple",
-          },
-          {
-            internalType: "uint256",
-            name: "nonce",
-            type: "uint256",
-          },
-          {
-            internalType: "uint256",
-            name: "deadline",
-            type: "uint256",
-          },
-        ],
-        internalType: "struct IPermit2.PermitTransferFrom",
-        name: "permit",
-        type: "tuple",
-      },
-      {
-        components: [
-          {
-            internalType: "address",
-            name: "to",
-            type: "address",
-          },
-          {
-            internalType: "uint256",
-            name: "requestedAmount",
-            type: "uint256",
-          },
-        ],
-        internalType: "struct IPermit2.SignatureTransferDetails",
-        name: "transferDetails",
-        type: "tuple",
-      },
-      {
-        internalType: "bytes",
-        name: "signature",
-        type: "bytes",
-      },
-    ],
-    name: "claimPaymentWithPermit2",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
         internalType: "address",
         name: "service",
         type: "address",
@@ -215,34 +133,6 @@ export const ONCHAIN_SUBSCRIPTION_ABI = [
     name: "createSubscription",
     outputs: [],
     stateMutability: "payable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "service",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "token",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "period",
-        type: "uint256",
-      },
-    ],
-    name: "createTokenSubscription",
-    outputs: [],
-    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -319,11 +209,6 @@ export const ONCHAIN_SUBSCRIPTION_ABI = [
       {
         internalType: "address",
         name: "service",
-        type: "address",
-      },
-      {
-        internalType: "address",
-        name: "token",
         type: "address",
       },
       {

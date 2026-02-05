@@ -24,7 +24,7 @@ export default function SubscriptionCard({
         <h3 className="text-lg font-semibold">{service}</h3>
 
         <div className="mt-2 flex gap-2 text-sm">
-          <span className="px-2 py-1 rounded bg-purple-500/20">{token}</span>
+          <span className="px-2 py-1 rounded bg-purple-500/20">ETH escrow</span>
           <span>{amount} / month</span>
         </div>
 

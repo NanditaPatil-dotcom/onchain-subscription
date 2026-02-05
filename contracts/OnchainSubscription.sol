@@ -1,45 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
-interface IPermit2 {
-    struct TokenPermissions {
-        address token;
-        uint256 amount;
-    }
-
-    struct PermitTransferFrom {
-        TokenPermissions permitted;
-        uint256 nonce;
-        uint256 deadline;
-    }
-
-    struct SignatureTransferDetails {
-        address to;
-        uint256 requestedAmount;
-    }
-
-    function permitTransferFrom(
-        PermitTransferFrom calldata permit,
-        SignatureTransferDetails calldata transferDetails,
-        address owner,
-        bytes calldata signature
-    ) external;
-}
 
 
 /// @title OnchainSubscription
 /// @notice Phase 1: Contract skeleton for on-chain subscription management
-contract OnchainSubscription is EIP712{
+contract OnchainSubscription is EIP712 {
     /// @notice Subscription data structure
     using ECDSA for bytes32;
-    address public constant PERMIT2 =
-  0x000000000022D473030F116dDEE9F6B43aC78BA3;
     struct Subscription {
         address subscriber;
         address service;
-        address token;
         uint256 amount;
         uint256 period;
         uint256 lastPaid;
@@ -53,60 +26,34 @@ contract OnchainSubscription is EIP712{
 
     /// @notice Counter for next subscription ID
     uint256 public nextSubscriptionId;
-    bytes32 public constant PAYMENT_TYPEHASH =
-        keccak256(
-            "PaymentApproval(uint256 subscriptionId,uint256 amount,uint256 nonce,uint256 expiry)"
-        );
-         constructor() EIP712("OnchainSubscription", "1") {}
+    bytes32 public constant PAYMENT_TYPEHASH = keccak256(
+        "PaymentApproval(uint256 subscriptionId,uint256 amount,uint256 nonce,uint256 expiry)"
+    );
+
+    constructor() EIP712("OnchainSubscription", "1") {}
     /// @notice Creates a new subscription
     /// @dev Placeholder - no logic implemented
     function createSubscription(
         address service,
         uint256 amount,
         uint256 period
-    ) external payable{
+    ) external payable {
         require(msg.value > 0, "No ETH sent");
         require(service != address(0), "Invalid service");
         uint256 id = nextSubscriptionId++;
 
         subscriptions[id] = Subscription({
-        subscriber: msg.sender,
-        service: service,
-        token: address(0),
-        amount: amount,
-        period: period,
-        lastPaid: block.timestamp,
-        nonce: 0,
-        balance: msg.value,
-        active: true
-    });
+            subscriber: msg.sender,
+            service: service,
+            amount: amount,
+            period: period,
+            // allow immediate first payment by backdating the clock
+            lastPaid: block.timestamp - period,
+            nonce: 0,
+            balance: msg.value,
+            active: true
+        });
     }
-
-    function createTokenSubscription(
-    address service,
-    address token,
-    uint256 amount,
-    uint256 period
-) external {
-    require(service != address(0), "Invalid service");
-    require(token != address(0), "Invalid token");
-
-    uint256 id = nextSubscriptionId++;
-
-    subscriptions[id] = Subscription({
-        subscriber: msg.sender,
-        service: service,
-        token: token,
-        amount: amount,
-        period: period,
-        lastPaid: block.timestamp,
-        nonce: 0,
-        balance: 0,
-        active: true
-    });
-}
-
-
 
     /// @notice Cancels an active subscription
     /// @param subscriptionId The ID of the subscription to cancel
@@ -119,12 +66,10 @@ contract OnchainSubscription is EIP712{
 
         sub.active = false;
 
-        if (sub.token == address(0)) {
         uint256 refund = sub.balance;
         sub.balance = 0;
         (bool ok, ) = msg.sender.call{value: refund}("");
         require(ok, "Refund failed");
-        }
     }
 
     /// @notice Claims a payment for a subscription
@@ -136,13 +81,14 @@ contract OnchainSubscription is EIP712{
         uint256 amount,
         uint256 nonce,
         uint256 expiry,
-        bytes calldata signature) external {
+        bytes calldata signature
+    ) external {
 
         Subscription storage sub = subscriptions[subscriptionId];
 
-        require(sub.token == address(0), "Use Permit2 for tokens");
         require(sub.active, "Inactive subscription");
-        require(msg.sender == sub.service, "Not service");
+        // Allow the service to pull or the subscriber to push (more user-friendly UX)
+        require(msg.sender == sub.service || msg.sender == sub.subscriber, "Not service");
         require(block.timestamp >= sub.lastPaid + sub.period, "Payment not due yet");
         require(block.timestamp <= expiry, "Signature expired");
         require(nonce == sub.nonce, "Invalid nonce");
@@ -166,39 +112,7 @@ contract OnchainSubscription is EIP712{
         (bool ok, ) = sub.service.call{value: amount}("");
         require(ok, "ETH Payment failed");
     }
-
-    function _getPermit2() internal view virtual returns (address) {
-    return PERMIT2;
-   }
-
-    function claimPaymentWithPermit2(
-        uint256 subscriptionId,
-        IPermit2.PermitTransferFrom calldata permit,
-        IPermit2.SignatureTransferDetails calldata transferDetails,
-        bytes calldata signature
-    ) external {
-        Subscription storage sub = subscriptions[subscriptionId];
-
-        require(sub.active, "Inactive subscription");
-        require(msg.sender == sub.service, "Not service");
-        require(sub.token != address(0), "ETH subscription");
-        require(block.timestamp >= sub.lastPaid + sub.period, "Payment not due yet");
-
-        // effects
-        sub.nonce++;
-        sub.lastPaid = block.timestamp;
-
-        // interaction (Permit2 pulls tokens directly)
-        IPermit2(_getPermit2()).permitTransferFrom(
-            permit,
-            transferDetails,
-            sub.subscriber,
-            signature
-        );
-    }
-
-
-        function _hashPaymentApproval(
+    function _hashPaymentApproval(
         uint256 subscriptionId,
         uint256 amount,
         uint256 nonce,

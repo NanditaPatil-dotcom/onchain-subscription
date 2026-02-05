@@ -4,7 +4,7 @@ export const SERVICES = [
     name: "Notion AI",
     address: "0x3cAAe16ffc210C7C398Ef5c889A35bb8D4684424",
     token: "ETH",
-    amount: "0.01",
+    amount: "0.001",
     period: 30 * 24 * 60 * 60,
     mode: "EIP712",
     description: "AI-powered workspace assistant"
@@ -13,20 +13,20 @@ export const SERVICES = [
     id: "netflix",
     name: "Netflix Pro",
     address: "0x1bE41833C32CdB8752a3a4d7e6ea575861782E05",
-    token: "USDC",
-    amount: "15",
+    token: "ETH",
+    amount: "0.002",
     period: 30 * 24 * 60 * 60,
-    mode: "PERMIT2",
+    mode: "EIP712",
     description: "Premium streaming subscription"
   },
   {
     id: "spotify",
     name: "Spotify Premium",
     address: "0x1bE41833C32CdB8752a3a4d7e6ea575861782E05",
-    token: "USDC",
-    amount: "5",
+    token: "ETH",
+    amount: "0.0015",
     period: 30 * 24 * 60 * 60,
-    mode: "PERMIT2",
+    mode: "EIP712",
     description: "Ad-free music streaming"
   }
 ]

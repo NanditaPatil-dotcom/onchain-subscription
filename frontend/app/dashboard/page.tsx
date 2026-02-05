@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import ApprovePaymentModal from '@/components/ApprovePaymentModal'
+import NewSubscriptionModal from '@/components/NewSubscriptionModal'
 import { getContract, getSigner } from '@/lib/web3'
 import { ethers } from 'ethers'
 import { signApproval } from '@/lib/signature'
-import { signPermit2Transfer } from '@/lib/permit2'
-import { constants } from 'ethers'
+import { SERVICES } from '@/lib/services'
 
 type StatCard = {
   label: string
@@ -17,10 +17,24 @@ type StatCard = {
 
 type Subscription = {
   service: string
-  token: 'ETH' | 'USDC' | 'DAI' | string
+  token: 'ETH'
   amount: string
   cadence: string
-  status: 'Awaiting Consent' | 'Paid'
+  status: 'Awaiting Consent' | 'Paid' | 'Cancelled'
+  mode?: 'EIP712'
+}
+
+type Service = (typeof SERVICES)[number]
+type ChainSub = {
+  subscriber: string
+  service: string
+  amount: ethers.BigNumber
+  period: ethers.BigNumber
+  lastPaid: ethers.BigNumber
+  nonce: ethers.BigNumber
+  balance: ethers.BigNumber
+  active: boolean
+  id: number
 }
 
 const stats: StatCard[] = [
@@ -29,26 +43,16 @@ const stats: StatCard[] = [
   { label: 'Pending approvals', value: '4', helper: '2 expiring today' },
 ]
 
-const subscriptions: Subscription[] = [
-  {
-    service: 'Notion AI',
-    token: 'ETH',
-    amount: '0.01',
-    cadence:"per month",
-    status: 'Awaiting Consent',
-  }
-]
-
 const statusStyles: Record<Subscription['status'], string> = {
   'Awaiting Consent': 'bg-amber-500/15 text-amber-200 border border-amber-400/30',
   Paid: 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30',
+  Cancelled: 'bg-slate-500/15 text-slate-200 border border-slate-400/30',
 }
 
 export default function DashboardPage() {
   const [selected, setSelected] = useState<Subscription | null>(null)
-  const [demoSubs, setDemoSubs] = useState<Subscription[]>(subscriptions)
-  const [subs, setSubs] = useState<any[]>([])
-  const [creating, setCreating] = useState(false)
+  const [subs, setSubs] = useState<ChainSub[]>([])
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [signature, setSignature] = useState<string | null>(null)
   const [signingIndex, setSigningIndex] = useState<number | null>(null)
   const [claiming, setClaiming] = useState(false)
@@ -60,8 +64,6 @@ export default function DashboardPage() {
     expiry: number
     amount: any
     nonce: any
-    isToken: boolean
-    permit?: any
   } | null>(null)
 
   const load = useCallback(async () => {
@@ -71,10 +73,20 @@ export default function DashboardPage() {
         const countBN = await contract.nextSubscriptionId()
         const count = Number(countBN.toString())
 
-        const data = []
+        const data: ChainSub[] = []
         for (let i = 0; i < count; i++) {
           const s = await contract.subscriptions(i)
-          data.push(s)
+          data.push({
+            id: i,
+            subscriber: s.subscriber,
+            service: s.service,
+            amount: ethers.BigNumber.from(s.amount ?? 0),
+            period: ethers.BigNumber.from(s.period ?? 0),
+            lastPaid: ethers.BigNumber.from(s.lastPaid ?? 0),
+            nonce: ethers.BigNumber.from(s.nonce ?? 0),
+            balance: ethers.BigNumber.from(s.balance ?? 0),
+            active: s.active,
+          })
         }
 
         setSubs(data)
@@ -90,29 +102,40 @@ export default function DashboardPage() {
     load()
   }, [load])
 
-  async function handleCreateSubscription() {
-    if (creating) return
-    const serviceAddress = window.prompt('Service address (0x...)')
-    if (!serviceAddress) return
+  // derive UI cards from on-chain subs: single source of truth for UX
+  const cards = useMemo(() => {
+    return subs
+      // UX rule: only active agreements render as cards; cancellations remove them
+      .filter((sub) => sub.active)
+      .map((sub) => {
+        const meta = SERVICES.find(
+          (svc) => svc.address.toLowerCase() === sub.service.toLowerCase(),
+        )
+        const tokenSymbol = 'ETH'
+        const amountFormatted = ethers.utils.formatEther(sub.amount ?? 0)
 
-    setCreating(true)
-    try {
-      const contract = await getContract(true)
-      const tx = await contract.createSubscription(
-        serviceAddress,
-        ethers.utils.parseEther('0.01'),
-        30 * 24 * 60 * 60,
-        { value: ethers.utils.parseEther('0.1') }
-      )
-      await tx.wait()
-      await load()
-    } catch (err) {
-      console.error('Subscription creation failed:', err)
-      window.alert('Subscription creation failed. Check console for details.')
-    } finally {
-      setCreating(false)
-    }
-  }
+        const now = Math.floor(Date.now() / 1000)
+        const due = sub.lastPaid
+          ? now >= Number(sub.lastPaid) + Number(sub.period)
+          : true
+        const hasFunds = ethers.BigNumber.from(sub.balance ?? 0).gte(sub.amount ?? 0)
+        const status: Subscription['status'] =
+          due && hasFunds ? 'Awaiting Consent' : 'Paid'
+
+        return {
+          id: sub.id,
+          service: meta?.name ?? `Service ${sub.id}`,
+          token: tokenSymbol,
+          amount: amountFormatted,
+          cadence: `${Math.max(1, Math.round(Number(sub.period) / 86400))}-day cycle`,
+          status,
+          mode: meta?.mode ?? 'EIP712',
+          raw: sub,
+          due,
+          hasFunds,
+        }
+      })
+  }, [subs])
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
@@ -156,18 +179,20 @@ export default function DashboardPage() {
               </p>
             </div>
             <button
-              onClick={handleCreateSubscription}
-              disabled={creating}
-              className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/20 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/15 disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={() => setIsModalOpen(true)}
+              className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/20 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/15"
             >
-              {creating ? 'Creating...' : 'New subscription'}
+              New subscription
             </button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {demoSubs.map((sub) => (
+            {cards.length === 0 && (
+              <p className="text-sm text-slate-400">No funded subscriptions yet.</p>
+            )}
+            {cards.map((sub) => (
               <motion.article
-                key={sub.service}
+                key={sub.id}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-5 shadow-[0_25px_70px_-35px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition hover:-translate-y-1 hover:border-white/20"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -180,7 +205,7 @@ export default function DashboardPage() {
                     <h3 className="text-lg font-semibold text-white">{sub.service}</h3>
                   </div>
                   <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white backdrop-blur-md">
-                    {sub.token}
+                    ETH escrow
                   </span>
                 </div>
 
@@ -198,17 +223,20 @@ export default function DashboardPage() {
                     whileHover={{ scale: 1.02, boxShadow: '0 12px 30px rgba(59,130,246,0.35)' }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
                     className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)] transition hover:shadow-[0_15px_40px_rgba(59,130,246,0.35)]"
-                    disabled={sub.status === 'Paid'}
-                    aria-disabled={sub.status === 'Paid'}
+                    disabled={!sub.due || !sub.hasFunds}
+                    aria-disabled={!sub.due || !sub.hasFunds}
                     onClick={() => {
-                      if (sub.status === 'Paid') return
-                      setSelected(sub)
-                      // default to the first on-chain subscription for signing if user launches from the sample card
-                      if (subs.length > 0) {
-                        setSigningIndex(0)
-                      } else {
-                        setSigningIndex(null)
-                      }
+                      if (!sub.due) return
+                      setSelected({
+                        service: sub.service,
+                        token: sub.token,
+                        amount: sub.amount,
+                        cadence: sub.cadence,
+                        status: sub.status,
+                        mode: sub.mode as Subscription['mode'],
+                      })
+                      setSigningIndex(sub.raw.id)
+                      setExpiryTs(Math.floor(Date.now() / 1000) + 300)
                     }}
                   >
                     Approve Payment
@@ -239,46 +267,55 @@ export default function DashboardPage() {
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-white">On-chain Subscriptions</h3>
-            <p className="text-sm text-slate-400">Live read from contract</p>
+            <p className="text-sm text-slate-400">Read-only mirror of contract state</p>
           </div>
           <div className="mt-4 space-y-3">
             {subs.length === 0 && (
               <p className="text-sm text-slate-400">No subscriptions found.</p>
             )}
-            {subs.map((s, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm text-slate-200"
-              >
-                <span className="font-mono text-xs text-slate-300">
-                  #{i} — {s.subscriber ?? 'N/A'}
-                </span>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-white">
-                    {s.amount ? s.amount.toString() : '0'} {s.token === constants.AddressZero ? 'wei' : 'tokens'}
+            {subs.map((s, i) => {
+              const meta = SERVICES.find(
+                (svc) => svc.address.toLowerCase() === (s.service ?? '').toLowerCase(),
+              )
+              const tokenSymbol = 'ETH'
+              const amountDisplay = ethers.utils.formatEther(s.amount ?? 0)
+              return (
+                <div
+                  key={i}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm text-slate-200"
+                >
+                  <span className="font-mono text-xs text-slate-300">
+                    #{i} — subscriber {s.subscriber ?? 'N/A'}
                   </span>
-                  <button
-                    className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-white hover:border-white/30 hover:bg-white/15 transition"
-                    disabled={signing}
-                    onClick={() => {
-                      setSelected({
-                        service: 'On-chain',
-                        token: s.token === constants.AddressZero ? 'ETH' : s.token ?? 'TOKEN',
-                        amount: s.amount ? s.amount.toString() : '0',
-                        cadence: 'per period',
-                        status: 'Awaiting Consent',
-                      })
-                      setSigningIndex(i)
-                      setExpiryTs(Math.floor(Date.now() / 1000) + 300)
-                    }}
-                  >
-                    {signing ? 'Signing...' : s.token === constants.AddressZero ? 'Approve (ETH)' : 'Permit2 + Claim'}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                      service {s.service ?? 'N/A'}
+                    </span>
+                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                      {amountDisplay} {tokenSymbol} per period
+                    </span>
+                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                      escrow {ethers.utils.formatEther(s.balance ?? 0)} ETH
+                    </span>
+                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                      nonce #{s.nonce?.toString() ?? '0'}
+                    </span>
+                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                      lastPaid {Number(s.lastPaid ?? 0)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
+        <NewSubscriptionModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onConfirm={async (service) => {
+            await handleCreateSubscription(service)
+          }}
+        />
         <ApprovePaymentModal
           open={!!selected}
           onClose={() => {
@@ -289,8 +326,12 @@ export default function DashboardPage() {
             void handleSign()
           }}
           amount={selected?.amount ?? '0'}
-          token={selected?.token ?? 'ETH'}
-          nonce={selected ? Math.floor(Math.random() * 10000) : 0}
+          token="ETH"
+          nonce={
+            signingIndex !== null
+              ? Number(subs.find((s) => s.id === signingIndex)?.nonce ?? 0)
+              : 0
+          }
           expiry={Math.max(0, expiryTs - Math.floor(Date.now() / 1000)) || 300}
         />
         {signature && (
@@ -311,6 +352,26 @@ export default function DashboardPage() {
     </div>
   )
 
+  // Plug-in point for creating subscriptions on-chain based on selected service
+  async function handleCreateSubscription(service: Service) {
+    try {
+      const contract = await getContract(true)
+
+      await contract.createSubscription(
+        service.address,
+        ethers.utils.parseEther(service.amount),
+        service.period,
+        { value: ethers.utils.parseEther(service.amount) },
+      )
+
+      await load()
+      setIsModalOpen(false)
+    } catch (err) {
+      console.error('Subscription creation failed:', err)
+      window.alert('Subscription creation failed. Check console for details.')
+    }
+  }
+
   async function handleSign() {
     if (signing) return
     let index = signingIndex
@@ -321,7 +382,6 @@ export default function DashboardPage() {
       }
       index = 0
       setSigningIndex(0)
-      setExpiryTs(Math.floor(Date.now() / 1000) + 300)
     }
     if (!process.env.NEXT_PUBLIC_CONTRACT_ADDRESS) {
       window.alert('Missing NEXT_PUBLIC_CONTRACT_ADDRESS in frontend/.env')
@@ -329,60 +389,36 @@ export default function DashboardPage() {
     }
     setSigning(true)
     try {
+      const contract = await getContract()
+      const fresh = await contract.subscriptions(index)
       const signer = await getSigner()
-      const sub = subs[index]
       const subscriptionId = index
-      const amountBN = sub?.amount ? ethers.BigNumber.from(sub.amount) : ethers.constants.Zero
-      const balanceBN = sub?.balance ? ethers.BigNumber.from(sub.balance) : amountBN
-      const payAmount = balanceBN.gt(amountBN) ? amountBN : balanceBN
-      const nonce = sub?.nonce ?? 0
+      const amountBN = ethers.BigNumber.from(fresh.amount ?? 0)
+      const balanceBN = ethers.BigNumber.from(fresh.balance ?? 0)
+      const payAmount = balanceBN.gte(amountBN) ? amountBN : balanceBN
+      const nonce = fresh.nonce ?? 0
       const expiry = Math.floor(Date.now() / 1000) + 900 // absolute timestamp (15m window)
 
-      let sig: string
-      if (sub?.token && sub.token !== constants.AddressZero) {
-        // Token subscription: use Permit2 signature
-        const permitSig = await signPermit2Transfer({
-          signer,
-          token: sub.token,
-          amount: payAmount,
-          nonce,
-          deadline: expiry,
-          to: sub.service ?? (await signer.getAddress()),
-          spender: sub.service ?? (await signer.getAddress()),
-        })
-        sig = permitSig.signature
-        // Store permit payload on the sub for later claim
-        setApproval({
-          subscriptionId,
-          signature: permitSig.signature,
-          expiry,
-          amount: payAmount,
-          nonce,
-          isToken: true,
-          permit: permitSig,
-        })
-      } else {
-        // ETH flow: EIP-712 approval
-        sig = await signApproval({
-          signer,
-          subscriptionId,
-          amount: payAmount,
-          nonce,
-          expiry,
-          contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
-        })
-        setApproval({
-          subscriptionId,
-          signature: sig,
-          expiry,
-          amount: payAmount,
-          nonce,
-          isToken: false,
-        })
-      }
+      const sig = await signApproval({
+        signer,
+        subscriptionId,
+        amount: payAmount,
+        nonce,
+        expiry,
+        contractAddress: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
+      })
+
+      setApproval({
+        subscriptionId,
+        signature: sig,
+        expiry,
+        amount: payAmount,
+        nonce,
+      })
 
       setSignature(sig)
       setSelected(null)
+      setExpiryTs(expiry)
     } catch (err) {
       console.error('Signing failed:', err)
       window.alert('Signing failed. Check console for details.')
@@ -396,45 +432,24 @@ export default function DashboardPage() {
       window.alert('Sign first to prepare claim.')
       return
     }
-    const {
-      subscriptionId,
-      signature: sig,
-      expiry,
-      amount,
-      nonce,
-      isToken,
-      permit,
-    } = approval
+    const { subscriptionId, signature: sig, expiry, amount, nonce } = approval
 
     setClaiming(true)
     try {
       const contract = await getContract(true)
 
-      const tx = isToken && permit
-        ? await contract.claimPaymentWithPermit2(
-            subscriptionId,
-            permit.permit,
-            permit.transferDetails,
-            permit.signature
-          )
-        : await contract.claimPayment(
-            subscriptionId,
-            amount,
-            nonce,
-            expiry,
-            sig
-          )
+      const tx = await contract.claimPayment(
+        subscriptionId,
+        amount,
+        nonce,
+        expiry,
+        sig
+      )
       await tx.wait()
       window.alert('Payment claimed on-chain!')
       await load()
       setApproval(null)
       setSignature(null)
-      // Mark demo card as paid for UX feedback
-      setDemoSubs((prev) =>
-        prev.map((s, idx) =>
-          idx === 0 ? { ...s, status: 'Paid' } : s
-        )
-      )
     } catch (err) {
       console.error('Claim failed:', err)
       window.alert('Claim failed. Check console for details.')

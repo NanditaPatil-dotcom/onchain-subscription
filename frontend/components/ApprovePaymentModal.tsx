@@ -85,7 +85,7 @@ export default function ApprovePaymentModal({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                    Permit2 Signature
+                    EIP-712 Consent
                   </p>
                   <h2
                     id="approve-payment-title"
@@ -105,13 +105,13 @@ export default function ApprovePaymentModal({
 
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <InfoBlock label="Amount" value={`${formatter.format(Number(amount))} ${token}`} />
-                <InfoBlock label="Token" value={token} />
+                <InfoBlock label="Asset" value={token} />
                 <InfoBlock label="Nonce" value={`#${nonce}`} />
                 <InfoBlock label="Expires in" value={countdown} emphasize />
               </div>
 
               <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-slate-300">
-                This signature is single-use and expires automatically.
+                Cryptographic consent powers a single ETH payment from your escrow. No automatic renewals.
               </div>
 
               <motion.button
