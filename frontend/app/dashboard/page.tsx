@@ -57,7 +57,7 @@ export default function DashboardPage() {
     amount: any
     nonce: any
   } | null>(null)
-  const [account, setAccount] = useState<string | null>(null)
+  const [currentAccount, setCurrentAccount] = useState<string | null>(null)
 
   const toChainSub = useCallback((sub: any, id: number): ChainSub => ({
     id,
@@ -73,7 +73,23 @@ export default function DashboardPage() {
     cancelledAt: undefined,
   }), [])
 
-  const load = useCallback(async () => {
+  const resetWalletScopedState = useCallback(() => {
+    setSubs([])
+    setApproval(null)
+    setSelected(null)
+    setSigningIndex(null)
+    setClaimingId(null)
+    setCancelingId(null)
+    setWithdrawingId(null)
+    setExpiryTs(0)
+  }, [])
+
+  const load = useCallback(async (wallet?: string | null) => {
+    const target = (wallet ?? currentAccount)?.toLowerCase()
+    if (!target) {
+      setSubs([])
+      return
+    }
     try {
       const contract = await getContract()
       const countBN = await contract.nextSubscriptionId()
@@ -87,8 +103,12 @@ export default function DashboardPage() {
         })
       )
 
+      const scoped = data.filter(
+        (d) => (d.subscriber ?? '').toLowerCase() === target,
+      )
+
       setSubs((prev) =>
-        data.map((d) => {
+        scoped.map((d) => {
           const prevMatch = prev.find((p) => p.id === d.id)
           return { ...d, cancelledAt: prevMatch?.cancelledAt }
         }),
@@ -96,36 +116,59 @@ export default function DashboardPage() {
     } catch (err) {
       console.error('Failed to load subscriptions:', err)
     }
-  }, [toChainSub])
+  }, [currentAccount, toChainSub])
 
+  // Sync the connected wallet from the provider and respond to changes.
   useEffect(() => {
-    load()
-  }, [load])
+    let mounted = true
 
-  // keep a lightweight view of the connected account for stats
-  useEffect(() => {
-    const syncAccount = async () => {
+    const resolveAccount = async () => {
       try {
         const provider = getProvider()
         const accounts: string[] = await provider.send('eth_accounts', [])
-        setAccount(accounts[0]?.toLowerCase() ?? null)
+        if (!mounted) return
+        if (accounts.length === 0) {
+          setCurrentAccount(null)
+          resetWalletScopedState()
+          return null
+        }
+        const signer = provider.getSigner(accounts[0])
+        const addr = (await signer.getAddress())?.toLowerCase()
+        setCurrentAccount(addr ?? null)
+        return addr ?? null
       } catch (err) {
+        if (mounted) {
+          setCurrentAccount(null)
+          resetWalletScopedState()
+        }
         console.warn('Account sync skipped:', err)
+        return null
       }
     }
 
-    syncAccount()
+    void resolveAccount()
 
-    if (typeof window === 'undefined' || !window.ethereum) return
+    if (typeof window === 'undefined' || !window.ethereum) return () => {}
 
-    const handleAccounts = (accounts: string[]) =>
-      setAccount(accounts[0]?.toLowerCase() ?? null)
+    const handleAccounts = async (accounts: string[]) => {
+      const next = accounts[0]?.toLowerCase() ?? null
+      resetWalletScopedState()
+      setCurrentAccount(next)
+      await load(next)
+    }
+
     window.ethereum.on('accountsChanged', handleAccounts)
 
     return () => {
+      mounted = false
       window.ethereum?.removeListener('accountsChanged', handleAccounts)
     }
-  }, [])
+  }, [load, resetWalletScopedState])
+
+  // Re-fetch whenever the active wallet changes.
+  useEffect(() => {
+    void load(currentAccount)
+  }, [currentAccount, load])
 
   // derive UI cards from on-chain subs: single source of truth for UX
   const cards = useMemo(() => {
@@ -190,16 +233,16 @@ export default function DashboardPage() {
       .filter(
         (s) =>
           s.active &&
-          account &&
-          (s.subscriber ?? '').toLowerCase() === account.toLowerCase(),
+          currentAccount &&
+          (s.subscriber ?? '').toLowerCase() === currentAccount.toLowerCase(),
       )
       .reduce((acc, s) => acc.add(s.balance ?? 0), ethers.BigNumber.from(0))
 
     const now = Math.floor(Date.now() / 1000)
     const pendingApprovals = subs.filter((s) => {
       if (!s.active) return false
-      if (!account) return false
-      if ((s.subscriber ?? '').toLowerCase() !== account.toLowerCase()) return false
+      if (!currentAccount) return false
+      if ((s.subscriber ?? '').toLowerCase() !== currentAccount.toLowerCase()) return false
       const due = now >= Number(s.lastPaid ?? 0) + Number(s.period ?? 0)
       return due
     }).length
@@ -218,7 +261,7 @@ export default function DashboardPage() {
         value: String(pendingApprovals)
       },
     ]
-  }, [account, subs])
+  }, [currentAccount, subs])
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
