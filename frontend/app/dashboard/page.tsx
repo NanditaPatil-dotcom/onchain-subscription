@@ -169,6 +169,11 @@ export default function DashboardPage() {
     })
   }, [subs])
 
+  const sortedOnChain = useMemo(
+    () => [...subs].sort((a, b) => b.id - a.id),
+    [subs],
+  )
+
   const stats: StatCard[] = useMemo(() => {
     const activeCount = subs.filter((s) => s.active).length
 
@@ -313,10 +318,10 @@ export default function DashboardPage() {
                 <h3 className="text-lg font-bold text-white">On-chain Subscriptions</h3>
               </div>
               <div className="mt-5 space-y-4">
-                {subs.length === 0 && (
+                {sortedOnChain.length === 0 && (
                   <p className="text-sm text-slate-400">No subscriptions found.</p>
                 )}
-                {subs.map((s, i) => {
+                {sortedOnChain.map((s, i) => {
                   const meta = SERVICE_BY_ADDRESS[(s.service ?? '').toLowerCase()]
                   const tokenSymbol = meta?.token ?? 'ETH'
                   const amountDisplay = ethers.utils.formatEther(s.amount ?? 0)
