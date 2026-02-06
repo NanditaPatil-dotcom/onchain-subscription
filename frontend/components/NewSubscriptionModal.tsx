@@ -15,7 +15,7 @@ type NewSubscriptionModalProps = {
 }
 
 const methodLabels: Record<Service['mode'], string> = {
-  EIP712: 'ETH escrow + EIP-712 consent',
+  EIP712: 'EIP-712 consent',
 }
 
 export default function NewSubscriptionModal({
@@ -102,7 +102,6 @@ export default function NewSubscriptionModal({
                   </h2>
                   <p className="mt-1 text-sm text-slate-300">
                     {step === 1 && 'Choose a service to subscribe to'}
-                    {step === 2 && 'Confirm billing details before signing'}
                     {step === 3 && 'Complete the on-chain setup to start billing'}
                   </p>
                 </div>
@@ -166,8 +165,8 @@ export default function NewSubscriptionModal({
                         value={`${selected.address.slice(0, 6)}...${selected.address.slice(-4)}`}
                       />
 
-                      <div className="sm:col-span-2 rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4 text-sm text-amber-100 shadow-inner">
-                        <p className="font-semibold">Funds are escrowed.</p>
+                      <div className="sm:col-span-2 rounded-2xl border border-amber-300/30 bg-amber-400/30 p-4 text-sm text-amber-100 shadow-inner">
+                        <p className="font-bold">Funds are escrowed.</p>
                         <p className="mt-1 text-amber-50/90">
                           Payments require cryptographic consent (EIP-712). No automatic renewals.
                         </p>
@@ -185,9 +184,6 @@ export default function NewSubscriptionModal({
                       className="grid gap-4"
                     >
                       <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900/70 via-slate-900/60 to-slate-800/40 p-5">
-                        <p className="text-sm text-slate-300">
-                          You are about to create a subscription for
-                        </p>
                         <h3 className="mt-2 text-2xl font-semibold text-white">
                           {selected.name}
                         </h3>
@@ -195,8 +191,7 @@ export default function NewSubscriptionModal({
                           {selected.amount} {selected.token} • {billingCycle} • {methodLabels[selected.mode]}
                         </p>
                         <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-200">
-                          <Badge>ETH escrow</Badge>
-                          <Badge>Cryptographic consent (EIP-712)</Badge>
+                          <Badge>ETH Escrow</Badge>
                           <Badge>No automatic renewals</Badge>
                         </div>
                       </div>
@@ -210,7 +205,6 @@ export default function NewSubscriptionModal({
                   <StepDot active={step >= 1} />
                   <StepDot active={step >= 2} />
                   <StepDot active={step >= 3} />
-                  <span className="ml-2 text-slate-400/80">Smooth transitions enabled</span>
                 </div>
 
                 <div className="flex w-full sm:w-auto gap-3">

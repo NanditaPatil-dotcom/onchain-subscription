@@ -36,16 +36,12 @@ export default function ServiceCard({
 
       <div className="relative flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
-            ETH escrow subscription
-          </p>
           <h3 className="mt-1 text-lg font-semibold text-white">{name}</h3>
           <p className="mt-1 text-sm text-slate-300">{description}</p>
         </div>
         <span
           className={cn(
-            'inline-flex shrink-0 items-center rounded-full bg-gradient-to-r px-3 py-1 text-xs font-semibold text-white shadow-[0_10px_30px_rgba(59,130,246,0.35)]',
-            'from-indigo-400 via-purple-500 to-sky-500',
+            'inline-flex shrink-0 items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white backdrop-blur-md'
           )}
         >
           EIP-712 consent

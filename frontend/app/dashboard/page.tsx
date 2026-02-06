@@ -205,18 +205,18 @@ export default function DashboardPage() {
       </div>
 
       <motion.div
-        className="relative z-10 mx-auto min-h-screen max-w-7xl px-6 lg:px-10 py-10 lg:py-14"
+        className="relative z-10 min-h-screen w-full px-8 lg:px-14 xl:px-20 py-10 lg:py-14"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
       >
-        <div className="grid grid-cols-1 gap-8 lg:gap-10 lg:grid-cols-12">
+        <div className="grid grid-cols-12 gap-y-12 gap-x-16">
           {/* Left column */}
-          <div className="col-span-12 space-y-10 lg:col-span-7">
+          <div className="col-span-12 space-y-10 lg:col-span-6">
             <div className="space-y-10">
               <Header />
 
-              <section className="grid gap-6 md:grid-cols-3">
+              <section className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
                 {stats.map((item) => (
                   <article
                     key={item.label}
@@ -245,14 +245,14 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div className="grid gap-6 lg:gap-8 sm:grid-cols-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {cards.length === 0 && (
                   <p className="text-sm text-slate-400">No funded subscriptions yet.</p>
                 )}
                 {cards.map((sub) => (
                   <motion.div
                     key={sub.id}
-                    className="w-full max-w-lg"
+                    className="w-full"
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, ease: 'easeOut' }}
@@ -295,8 +295,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Right column: read-only mirror */}
-          <section className="col-span-12 lg:col-span-5">
-            <div className="h-full min-h-[70vh] rounded-2xl border border-white/10 bg-slate-900/60 p-6 lg:p-8 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
+          <section className="col-span-12 lg:col-span-6 lg:pl-4 xl:pl-8">
+            <div className="h-full min-h-[80vh] space-y-5 rounded-2xl border border-white/10 bg-slate-900/60 p-6 lg:p-8 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-white">On-chain Subscriptions</h3>
                 <p className="text-sm text-slate-400">Read-only mirror of contract state</p>
