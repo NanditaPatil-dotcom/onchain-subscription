@@ -47,6 +47,7 @@ export default function DashboardPage() {
   const [signing, setSigning] = useState(false)
   const [expiryTs, setExpiryTs] = useState<number>(0)
   const [cancelingId, setCancelingId] = useState<number | null>(null)
+  const [withdrawingId, setWithdrawingId] = useState<number | null>(null)
   const [approval, setApproval] = useState<{
     subscriptionId: number
     signature: string
@@ -152,6 +153,7 @@ export default function DashboardPage() {
           raw: sub,
           due,
           hasFunds,
+          hasEscrow: ethers.BigNumber.from(sub.balance ?? 0).gt(0),
         }
       })
   }, [subs])
@@ -229,9 +231,6 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-white">Subscriptions</h2>
-              <p className="mt-1 text-xs text-slate-400">
-                Cancel stops future claims and keeps history on-chain; it does not delete the record or refund past payments.
-              </p>
             </div>
             <button
               onClick={() => setIsModalOpen(true)}
@@ -279,6 +278,9 @@ export default function DashboardPage() {
                   approveDisabled={!sub.due || !sub.hasFunds}
                   onCancel={(id) => void cancelSubscription(id)}
                   cancelDisabled={cancelingId === sub.id}
+                  onWithdraw={(id) => void withdrawEscrow(id)}
+                  hasEscrow={sub.hasEscrow}
+                  withdrawDisabled={withdrawingId === sub.id}
                 />
               </motion.div>
             ))}
@@ -391,6 +393,27 @@ export default function DashboardPage() {
       window.alert('Cancel failed. Check console for details.')
     } finally {
       setCancelingId(null)
+    }
+  }
+
+  async function withdrawEscrow(subscriptionId: number) {
+    const confirmed = window.confirm(
+      'Withdraw unused escrow? This is only available after cancellation.'
+    )
+    if (!confirmed) return
+
+    try {
+      setWithdrawingId(subscriptionId)
+      const contract = await getContract(true)
+      const tx = await contract.withdrawEscrow(subscriptionId)
+      await tx.wait()
+      window.alert('Escrow withdrawn to your wallet.')
+      await load()
+    } catch (err) {
+      console.error('Withdraw failed:', err)
+      window.alert('Withdraw failed. Check console for details.')
+    } finally {
+      setWithdrawingId(null)
     }
   }
 

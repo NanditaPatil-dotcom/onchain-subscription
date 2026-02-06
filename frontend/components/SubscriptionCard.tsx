@@ -11,6 +11,9 @@ type SubscriptionCardProps = {
   token?: string
   onApprove?: () => void
   onCancel: (subscriptionId: number) => void | Promise<void>
+  onWithdraw?: (subscriptionId: number) => void | Promise<void>
+  hasEscrow?: boolean
+  withdrawDisabled?: boolean
   approveDisabled?: boolean
   cancelDisabled?: boolean
   footer?: ReactNode
@@ -31,6 +34,9 @@ export default function SubscriptionCard({
   token = 'ETH',
   onApprove,
   onCancel,
+  onWithdraw,
+  hasEscrow = false,
+  withdrawDisabled,
   approveDisabled,
   cancelDisabled,
   footer,
@@ -92,8 +98,21 @@ export default function SubscriptionCard({
             Cancel subscription
           </button>
         ) : (
-          // spacer keeps card height consistent when button is hidden
-          <div className="mt-1 h-[38px]" aria-hidden />
+          <div className="flex flex-col gap-2">
+            {hasEscrow && onWithdraw ? (
+              <button
+                type="button"
+                onClick={() => onWithdraw(subscriptionId)}
+                className="mt-1 rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-100 px-4 py-2 text-sm hover:border-emerald-300/60 hover:bg-emerald-500/15 transition"
+                disabled={withdrawDisabled}
+              >
+                Withdraw escrow
+              </button>
+            ) : (
+              // spacer keeps card height consistent when button is hidden
+              <div className="mt-1 h-[38px]" aria-hidden />
+            )}
+          </div>
         )}
         {footer}
       </div>

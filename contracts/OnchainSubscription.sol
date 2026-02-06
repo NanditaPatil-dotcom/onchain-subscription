@@ -65,11 +65,22 @@ contract OnchainSubscription is EIP712 {
         require(sub.active, "Already inactive");
 
         sub.active = false;
+    }
 
-        uint256 refund = sub.balance;
+    /// @notice Withdraw unused escrow after cancellation
+    /// @param subscriptionId The ID of the subscription to withdraw from
+    function withdrawEscrow(uint256 subscriptionId) external {
+        Subscription storage sub = subscriptions[subscriptionId];
+
+        require(msg.sender == sub.subscriber, "Not subscriber");
+        require(!sub.active, "Subscription still active");
+        require(sub.balance > 0, "No escrow to withdraw");
+
+        uint256 amount = sub.balance;
         sub.balance = 0;
-        (bool ok, ) = msg.sender.call{value: refund}("");
-        require(ok, "Refund failed");
+
+        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        require(ok, "ETH transfer failed");
     }
 
     /// @notice Claims a payment for a subscription
@@ -86,7 +97,7 @@ contract OnchainSubscription is EIP712 {
 
         Subscription storage sub = subscriptions[subscriptionId];
 
-        require(sub.active, "Inactive subscription");
+        require(sub.active, "Subscription cancelled");
         // Allow the service to pull or the subscriber to push (more user-friendly UX)
         require(msg.sender == sub.service || msg.sender == sub.subscriber, "Not service");
         require(block.timestamp >= sub.lastPaid + sub.period, "Payment not due yet");

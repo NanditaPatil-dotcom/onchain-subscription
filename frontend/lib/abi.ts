@@ -86,6 +86,19 @@ export const ONCHAIN_SUBSCRIPTION_ABI = [
         name: "subscriptionId",
         type: "uint256",
       },
+    ],
+    name: "withdrawEscrow",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "subscriptionId",
+        type: "uint256",
+      },
       {
         internalType: "uint256",
         name: "amount",
