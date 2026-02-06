@@ -205,133 +205,144 @@ export default function DashboardPage() {
       </div>
 
       <motion.div
-        className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-10"
+        className="relative z-10 mx-auto min-h-screen max-w-7xl px-6 lg:px-10 py-10 lg:py-14"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
       >
-        <Header />
+        <div className="grid grid-cols-1 gap-8 lg:gap-10 lg:grid-cols-12">
+          {/* Left column */}
+          <div className="col-span-12 space-y-10 lg:col-span-7">
+            <div className="space-y-10">
+              <Header />
 
-        <section className="grid gap-4 md:grid-cols-3">
-          {stats.map((item) => (
-            <article
-              key={item.label}
-              className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl"
-            >
-              <p className="text-sm uppercase tracking-wide text-slate-300">{item.label}</p>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-semibold text-white">{item.value}</span>
-              </div>
-              <div className="mt-4 h-px w-full bg-gradient-to-r from-white/5 via-white/20 to-white/5" />
-            </article>
-          ))}
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Subscriptions</h2>
+              <section className="grid gap-6 md:grid-cols-3">
+                {stats.map((item) => (
+                  <article
+                    key={item.label}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl"
+                  >
+                    <p className="text-sm uppercase tracking-wide text-slate-300">{item.label}</p>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-3xl font-semibold text-white">{item.value}</span>
+                    </div>
+                    <div className="mt-4 h-px w-full bg-gradient-to-r from-white/5 via-white/20 to-white/5" />
+                  </article>
+                ))}
+              </section>
             </div>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/20 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/15"
-            >
-              New subscription
-            </button>
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {cards.length === 0 && (
-              <p className="text-sm text-slate-400">No funded subscriptions yet.</p>
-            )}
-            {cards.map((sub) => (
-              <motion.div
-                key={sub.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, ease: 'easeOut' }}
-              >
-                <SubscriptionCard
-                  subscriptionId={sub.id}
-                  serviceName={sub.service}
-                  amount={sub.amount}
-                  period={sub.cadence}
-                  status={sub.status}
-                  token="ETH"
-                  onApprove={
-                    sub.status === 'Awaiting Consent'
-                      ? () => {
-                          if (!sub.due) return
-                          setSelected({
-                            service: sub.service,
-                            token: 'ETH',
-                            amount: sub.amount,
-                            cadence: sub.cadence,
-                            status: sub.status,
-                            mode: sub.mode as Subscription['mode'],
-                          })
-                          setSigningIndex(sub.raw.id)
-                          setExpiryTs(Math.floor(Date.now() / 1000) + 300)
-                        }
-                      : undefined
-                  }
-                  approveDisabled={!sub.due || !sub.hasFunds}
-                  onCancel={(id) => void cancelSubscription(id)}
-                  cancelDisabled={cancelingId === sub.id}
-                  onWithdraw={(id) => void withdrawEscrow(id)}
-                  hasEscrow={sub.hasEscrow}
-                  withdrawDisabled={withdrawingId === sub.id}
-                />
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">On-chain Subscriptions</h3>
-            <p className="text-sm text-slate-400">Read-only mirror of contract state</p>
-          </div>
-          <div className="mt-4 space-y-3">
-            {subs.length === 0 && (
-              <p className="text-sm text-slate-400">No subscriptions found.</p>
-            )}
-            {subs.map((s, i) => {
-              const meta = SERVICES.find(
-                (svc) => svc.address.toLowerCase() === (s.service ?? '').toLowerCase(),
-              )
-              const tokenSymbol = 'ETH'
-              const amountDisplay = ethers.utils.formatEther(s.amount ?? 0)
-              return (
-                <div
-                  key={i}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm text-slate-200"
-                >
-                  <span className="font-mono text-xs text-slate-300">
-                    #{i} — subscriber {s.subscriber ?? 'N/A'}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-3 text-xs">
-                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
-                      service {s.service ?? 'N/A'}
-                    </span>
-                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
-                      {amountDisplay} {tokenSymbol} per period
-                    </span>
-                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
-                      escrow {ethers.utils.formatEther(s.balance ?? 0)} ETH
-                    </span>
-                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
-                      nonce #{s.nonce?.toString() ?? '0'}
-                    </span>
-                    <span className="rounded-full border border-white/10 px-2 py-1 text-white">
-                      lastPaid {Number(s.lastPaid ?? 0)}
-                    </span>
-                  </div>
+            <section className="space-y-5 mt-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Subscriptions</h2>
                 </div>
-              )
-            })}
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/20 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/15"
+                >
+                  New subscription
+                </button>
+              </div>
+
+              <div className="grid gap-6 lg:gap-8 sm:grid-cols-2">
+                {cards.length === 0 && (
+                  <p className="text-sm text-slate-400">No funded subscriptions yet.</p>
+                )}
+                {cards.map((sub) => (
+                  <motion.div
+                    key={sub.id}
+                    className="w-full max-w-lg"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                  >
+                    <SubscriptionCard
+                      subscriptionId={sub.id}
+                      serviceName={sub.service}
+                      amount={sub.amount}
+                      period={sub.cadence}
+                      status={sub.status}
+                      token="ETH"
+                      onApprove={
+                        sub.status === 'Awaiting Consent'
+                          ? () => {
+                              if (!sub.due) return
+                              setSelected({
+                                service: sub.service,
+                                token: 'ETH',
+                                amount: sub.amount,
+                                cadence: sub.cadence,
+                                status: sub.status,
+                                mode: sub.mode as Subscription['mode'],
+                              })
+                              setSigningIndex(sub.raw.id)
+                              setExpiryTs(Math.floor(Date.now() / 1000) + 300)
+                            }
+                          : undefined
+                      }
+                      approveDisabled={!sub.due || !sub.hasFunds}
+                      onCancel={(id) => void cancelSubscription(id)}
+                      cancelDisabled={cancelingId === sub.id}
+                      onWithdraw={(id) => void withdrawEscrow(id)}
+                      hasEscrow={sub.hasEscrow}
+                      withdrawDisabled={withdrawingId === sub.id}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            </section>
           </div>
-        </section>
+
+          {/* Right column: read-only mirror */}
+          <section className="col-span-12 lg:col-span-5">
+            <div className="h-full min-h-[70vh] rounded-2xl border border-white/10 bg-slate-900/60 p-6 lg:p-8 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">On-chain Subscriptions</h3>
+                <p className="text-sm text-slate-400">Read-only mirror of contract state</p>
+              </div>
+              <div className="mt-5 space-y-4">
+                {subs.length === 0 && (
+                  <p className="text-sm text-slate-400">No subscriptions found.</p>
+                )}
+                {subs.map((s, i) => {
+                  const meta = SERVICES.find(
+                    (svc) => svc.address.toLowerCase() === (s.service ?? '').toLowerCase(),
+                  )
+                  const tokenSymbol = 'ETH'
+                  const amountDisplay = ethers.utils.formatEther(s.amount ?? 0)
+                  return (
+                    <div
+                      key={i}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm text-slate-200"
+                    >
+                      <span className="font-mono text-xs text-slate-300">
+                        #{i} — subscriber {s.subscriber ?? 'N/A'}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-3 text-xs">
+                        <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                          service {meta?.name ?? s.service ?? 'N/A'}
+                        </span>
+                        <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                          {amountDisplay} {tokenSymbol} per period
+                        </span>
+                        <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                          escrow {ethers.utils.formatEther(s.balance ?? 0)} ETH
+                        </span>
+                        <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                          nonce #{s.nonce?.toString() ?? '0'}
+                        </span>
+                        <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                          lastPaid {Number(s.lastPaid ?? 0)}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
+        </div>
         <NewSubscriptionModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
