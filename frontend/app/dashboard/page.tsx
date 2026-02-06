@@ -37,12 +37,6 @@ type ChainSub = {
   id: number
 }
 
-const stats: StatCard[] = [
-  { label: 'Active subscriptions', value: '12', helper: '+3 this week' },
-  { label: 'Escrowed balance', value: '18.4 ETH', helper: '≈ $52,300' },
-  { label: 'Pending approvals', value: '4', helper: '2 expiring today' },
-]
-
 const statusStyles: Record<Subscription['status'], string> = {
   'Awaiting Consent': 'bg-amber-500/15 text-amber-200 border border-amber-400/30',
   Paid: 'bg-emerald-500/15 text-emerald-200 border border-emerald-400/30',
@@ -65,6 +59,7 @@ export default function DashboardPage() {
     amount: any
     nonce: any
   } | null>(null)
+  const [account, setAccount] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -102,6 +97,31 @@ export default function DashboardPage() {
     load()
   }, [load])
 
+  // keep a lightweight view of the connected account for stats
+  useEffect(() => {
+    const syncAccount = async () => {
+      try {
+        const provider = getProvider()
+        const accounts: string[] = await provider.send('eth_accounts', [])
+        setAccount(accounts[0]?.toLowerCase() ?? null)
+      } catch (err) {
+        console.warn('Account sync skipped:', err)
+      }
+    }
+
+    syncAccount()
+
+    if (typeof window === 'undefined' || !window.ethereum) return
+
+    const handleAccounts = (accounts: string[]) =>
+      setAccount(accounts[0]?.toLowerCase() ?? null)
+    window.ethereum.on('accountsChanged', handleAccounts)
+
+    return () => {
+      window.ethereum?.removeListener('accountsChanged', handleAccounts)
+    }
+  }, [])
+
   // derive UI cards from on-chain subs: single source of truth for UX
   const cards = useMemo(() => {
     return subs
@@ -136,6 +156,43 @@ export default function DashboardPage() {
         }
       })
   }, [subs])
+
+  const stats: StatCard[] = useMemo(() => {
+    const activeCount = cards.length
+
+    const escrowTotal = subs
+      .filter(
+        (s) =>
+          s.active &&
+          account &&
+          (s.subscriber ?? '').toLowerCase() === account.toLowerCase(),
+      )
+      .reduce((acc, s) => acc.add(s.balance ?? 0), ethers.BigNumber.from(0))
+
+    const now = Math.floor(Date.now() / 1000)
+    const pendingApprovals = subs.filter((s) => {
+      if (!s.active) return false
+      if (!account) return false
+      if ((s.subscriber ?? '').toLowerCase() !== account.toLowerCase()) return false
+      const due = now >= Number(s.lastPaid ?? 0) + Number(s.period ?? 0)
+      return due
+    }).length
+
+    return [
+      {
+        label: 'Active subscriptions',
+        value: String(activeCount)
+      },
+      {
+        label: 'Escrowed balance',
+        value: `${ethers.utils.formatEther(escrowTotal)} ETH`
+      },
+      {
+        label: 'Pending approvals',
+        value: String(pendingApprovals)
+      },
+    ]
+  }, [account, cards.length, subs])
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
@@ -174,9 +231,6 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-white">Subscriptions</h2>
-              <p className="text-sm text-slate-400">
-                Manage recurring agreements and approve upcoming payments.
-              </p>
             </div>
             <button
               onClick={() => setIsModalOpen(true)}
@@ -205,7 +259,7 @@ export default function DashboardPage() {
                     <h3 className="text-lg font-semibold text-white">{sub.service}</h3>
                   </div>
                   <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white backdrop-blur-md">
-                    ETH escrow
+                    ETH 
                   </span>
                 </div>
 
