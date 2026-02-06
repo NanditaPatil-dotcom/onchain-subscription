@@ -12,7 +12,6 @@ import { SERVICES } from '@/lib/services'
 type StatCard = {
   label: string
   value: string
-  helper: string
 }
 
 type Subscription = {
