@@ -18,6 +18,7 @@ type SubscriptionCardProps = {
   cancelDisabled?: boolean
   footer?: ReactNode
   approved?: boolean
+  cancelledAt?: number
 }
 
 const badgeStyles: Record<SubscriptionCardProps['status'], string> = {
@@ -42,7 +43,19 @@ export default function SubscriptionCard({
   cancelDisabled,
   footer,
   approved = false,
+  cancelledAt,
 }: SubscriptionCardProps) {
+  const formattedCancelled =
+    cancelledAt !== undefined
+      ? new Date(cancelledAt * 1000).toLocaleString(undefined, {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null
+
   return (
     <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-5 shadow-[0_25px_70px_-35px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition hover:-translate-y-1 hover:border-white/20">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(124,58,237,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(16,185,129,0.15),transparent_30%)] opacity-70" />
@@ -118,6 +131,12 @@ export default function SubscriptionCard({
         )}
         {footer}
       </div>
+
+      {status === 'Cancelled' && formattedCancelled && (
+        <div className="relative mt-4 text-xs text-white/50">
+          Cancelled on {formattedCancelled}
+        </div>
+      )}
     </article>
   )
 }

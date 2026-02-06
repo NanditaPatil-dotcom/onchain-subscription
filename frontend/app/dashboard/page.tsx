@@ -22,6 +22,7 @@ type Subscription = {
   cadence: string
   status: 'Awaiting Consent' | 'Paid' | 'Cancelled'
   mode?: 'EIP712'
+  cancelledAt?: number
 }
 
 type Service = (typeof SERVICES)[number]
@@ -36,6 +37,7 @@ type ChainSub = {
   active: boolean
   id: number
   approved?: boolean
+  cancelledAt?: number
 }
 
 export default function DashboardPage() {
@@ -68,6 +70,7 @@ export default function DashboardPage() {
     balance: ethers.BigNumber.from(sub.balance ?? 0),
     active: sub.active,
     approved: false,
+    cancelledAt: undefined,
   }), [])
 
   const load = useCallback(async () => {
@@ -84,7 +87,12 @@ export default function DashboardPage() {
         })
       )
 
-      setSubs(data)
+      setSubs((prev) =>
+        data.map((d) => {
+          const prevMatch = prev.find((p) => p.id === d.id)
+          return { ...d, cancelledAt: prevMatch?.cancelledAt }
+        }),
+      )
     } catch (err) {
       console.error('Failed to load subscriptions:', err)
     }
@@ -149,6 +157,7 @@ export default function DashboardPage() {
         mode: meta?.mode ?? 'EIP712',
         approved: sub.approved || approvedId === sub.id,
         raw: sub,
+        cancelledAt: sub.cancelledAt,
         due,
         hasFunds,
         hasEscrow: ethers.BigNumber.from(sub.balance ?? 0).gt(0),
@@ -281,6 +290,7 @@ export default function DashboardPage() {
                       status={sub.status}
                       token="ETH"
                       approved={sub.approved}
+                      cancelledAt={sub.cancelledAt}
                       onApprove={
                         sub.status === 'Awaiting Consent'
                           ? () => {
@@ -332,6 +342,7 @@ export default function DashboardPage() {
                     isApproved &&
                     ethers.BigNumber.from(s.balance ?? 0).gt(0) &&
                     now >= Number(s.lastPaid ?? 0) + Number(s.period ?? 0)
+                  const isCancelled = !s.active
                   return (
                     <div
                       key={i}
@@ -341,8 +352,13 @@ export default function DashboardPage() {
                         #{i} — subscriber {s.subscriber ?? 'N/A'}
                       </span>
                       <div className="flex flex-wrap items-center gap-3 text-xs">
-                        <span className="rounded-full border border-white/10 px-2 py-1 text-white">
+                        <span className="rounded-full border border-white/10 px-2 py-1 text-white flex items-center gap-2">
                           service {meta?.name ?? s.service ?? 'Unknown Service'}
+                          {isCancelled && (
+                            <span className="inline-flex items-center rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400 border border-red-500/20">
+                              Cancelled
+                            </span>
+                          )}
                         </span>
                         <span className="rounded-full border border-white/10 px-2 py-1 text-white">
                           {amountDisplay} {tokenSymbol} per period
@@ -410,6 +426,12 @@ export default function DashboardPage() {
 
     try {
       setCancelingId(subscriptionId)
+      const cancelledAt = Math.floor(Date.now() / 1000)
+      setSubs((prev) =>
+        prev.map((s) =>
+          s.id === subscriptionId ? { ...s, active: false, cancelledAt } : s,
+        ),
+      )
       const contract = await getContract(true)
       const tx = await contract.cancelSubscription(subscriptionId)
       await tx.wait()
