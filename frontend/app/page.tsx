@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Navbar } from '@/components/navbar'
 import { Hero } from '@/components/hero'
-import { Stats } from '@/components/stats'
+import { HowItWorks } from '@/components/stats'
 import { FloatingOrbs } from '@/components/floating-orbs'
 import LiquidEther from '@/components/liquid-ether'
 import ApprovePaymentModal from '@/components/ApprovePaymentModal'
@@ -52,7 +52,7 @@ export default function Home() {
       >
         <Navbar />
         <Hero />
-        <Stats />
+        <HowItWorks />
       </motion.div>
 
       {/* Floating demo trigger for Approve modal */}

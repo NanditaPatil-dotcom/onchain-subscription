@@ -10,8 +10,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Consent - On-Chain Subscription Payments',
-  description: 'Next-generation consent-based recurring payments on Ethereum with gasless approvals and cryptographic verification.',
-  generator: 'v0.app',
+  description: 'Next-generation consent-based recurring payments on Ethereum with cryptographic verification.',
   viewport: {
     width: 'device-width',
     initialScale: 1,
