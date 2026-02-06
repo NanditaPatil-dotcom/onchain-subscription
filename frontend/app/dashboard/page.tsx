@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import ApprovePaymentModal from '@/components/ApprovePaymentModal'
 import NewSubscriptionModal from '@/components/NewSubscriptionModal'
-import { getContract, getSigner } from '@/lib/web3'
+import { getContract, getSigner, getProvider } from '@/lib/web3'
 import { ethers } from 'ethers'
 import { signApproval } from '@/lib/signature'
 import { SERVICES } from '@/lib/services'
@@ -460,26 +460,137 @@ export default function DashboardPage() {
 }
 
 function Header() {
-  const wallet = '0xA2f3...9bC4'
-  const network = 'Sepolia'
+  const [wallet, setWallet] = useState<string | null>(null)
+  const [chainId, setChainId] = useState<number | null>(null)
+  const [connecting, setConnecting] = useState(false)
+
+  // Map a few common chainIds to friendly names; falls back to numeric id.
+  const chainName = useMemo(() => {
+    if (!chainId) return 'Not connected'
+    const lookup: Record<number, string> = {
+      1: 'Ethereum Mainnet',
+      5: 'Goerli',
+      11155111: 'Sepolia',
+      137: 'Polygon',
+      8453: 'Base',
+    }
+    return `${lookup[chainId] ?? 'Chain'}`
+  }, [chainId])
+
+  useEffect(() => {
+    const syncFromProvider = async () => {
+      try {
+        const provider = getProvider()
+        // eth_accounts is non-invasive and returns already-connected addresses.
+        const accounts: string[] = await provider.send('eth_accounts', [])
+        setWallet(accounts[0] ?? null)
+
+        const network = await provider.getNetwork()
+        setChainId(Number(network.chainId))
+      } catch (err) {
+        console.warn('Wallet sync skipped:', err)
+      }
+    }
+
+    syncFromProvider()
+
+    if (typeof window === 'undefined' || !window.ethereum) return
+
+    const handleAccounts = (accounts: string[]) => setWallet(accounts[0] ?? null)
+    const handleChain = (id: string) => setChainId(parseInt(id, 16))
+    const handleDisconnect = () => {
+      setWallet(null)
+      setChainId(null)
+    }
+
+    window.ethereum.on('accountsChanged', handleAccounts)
+    window.ethereum.on('chainChanged', handleChain)
+    window.ethereum.on('disconnect', handleDisconnect)
+
+    return () => {
+      window.ethereum?.removeListener('accountsChanged', handleAccounts)
+      window.ethereum?.removeListener('chainChanged', handleChain)
+      window.ethereum?.removeListener('disconnect', handleDisconnect)
+    }
+  }, [])
+
+  const handleConnect = useCallback(async () => {
+    if (!window.ethereum) {
+      window.alert('MetaMask is not installed.')
+      return
+    }
+    setConnecting(true)
+    try {
+      const provider = getProvider()
+      const accounts: string[] = await provider.send('eth_requestAccounts', [])
+      setWallet(accounts[0] ?? null)
+
+      const network = await provider.getNetwork()
+      setChainId(Number(network.chainId))
+    } catch (err) {
+      console.error('Wallet connect failed:', err)
+      window.alert('Failed to connect wallet. Check console for details.')
+    } finally {
+      setConnecting(false)
+    }
+  }, [])
+
+  const handleSwitch = useCallback(async () => {
+    if (!window.ethereum) {
+      window.alert('MetaMask is not installed.')
+      return
+    }
+    setConnecting(true)
+    try {
+      const provider = getProvider()
+      // wallet_requestPermissions opens the MetaMask account picker.
+      await provider.send('wallet_requestPermissions', [{ eth_accounts: {} }])
+      const accounts: string[] = await provider.send('eth_accounts', [])
+      setWallet(accounts[0] ?? null)
+
+      const network = await provider.getNetwork()
+      setChainId(Number(network.chainId))
+    } catch (err) {
+      console.error('Wallet switch failed:', err)
+      // Fallback: try a plain requestAccounts which also opens MetaMask.
+      try {
+        const provider = getProvider()
+        const accounts: string[] = await provider.send('eth_requestAccounts', [])
+        setWallet(accounts[0] ?? null)
+
+        const network = await provider.getNetwork()
+        setChainId(Number(network.chainId))
+      } catch (fallbackErr) {
+        console.error('Wallet fallback connect failed:', fallbackErr)
+        window.alert('Failed to open MetaMask for wallet selection.')
+      }
+    } finally {
+      setConnecting(false)
+    }
+  }, [])
+
+  const walletLabel =
+    wallet
+      ? `${wallet}`
+      : wallet ?? 'Not connected'
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/5 px-6 py-4 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
-      <div>
-        <p className="text-sm uppercase tracking-wide text-slate-300">DeFi Dashboard</p>
-        <h1 className="text-2xl font-semibold text-white">Subscriptions & Escrow</h1>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex w-full flex-wrap items-center gap-3">
         <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-100">
           <span className="h-2 w-2 rounded-full bg-emerald-400" />
-          {network}
+          {chainName}
         </span>
         <span className="rounded-full border border-white/15 bg-black/40 px-3 py-1 text-sm font-mono text-slate-100 shadow-inner shadow-white/5">
-          {wallet}
+          {walletLabel}
         </span>
-        <button className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/15">
-          Switch wallet
+        <button
+          onClick={() => void (wallet ? handleSwitch() : handleConnect())}
+          disabled={connecting}
+          className="ml-auto rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/15 disabled:opacity-60"
+        >
+          {wallet ? 'Switch wallet' : 'Connect wallet'}
         </button>
       </div>
     </header>
