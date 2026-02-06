@@ -5,14 +5,27 @@ import { getSigner } from "@/lib/web3";
 
 export function Navbar() {
   const [address, setAddress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function connectWallet() {
-    const signer = await getSigner();
-    const addr = await signer.getAddress();
-    // Helpful for local debugging: prints the full address in the browser console
-    // so you can confirm which wallet/account is connected.
-    console.log("Connected wallet address:", addr);
-    setAddress(addr);
+    try {
+      // Catch the common case where MetaMask isn't available and surface it to the user.
+      if (typeof window === "undefined" || !window.ethereum) {
+        setError("MetaMask is not installed. Please install it to connect your wallet.");
+        return;
+      }
+
+      setError(null);
+      const signer = await getSigner();
+      const addr = await signer.getAddress();
+      // Helpful for local debugging: prints the full address in the browser console
+      // so you can confirm which wallet/account is connected.
+      console.log("Connected wallet address:", addr);
+      setAddress(addr);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to connect wallet";
+      setError(message);
+    }
   }
 
   return (
@@ -42,6 +55,25 @@ export function Navbar() {
           </button>
         </div>
       </div>
+      {error && (
+        <div className="pointer-events-auto fixed right-4 top-20 z-40 max-w-sm rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100 shadow-xl shadow-red-900/30 backdrop-blur">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 h-2.5 w-2.5 rounded-full bg-red-400" aria-hidden />
+            <div className="flex-1">
+              <p className="font-semibold text-red-200">MetaMask required</p>
+              <p className="text-red-100/90">{error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="ml-2 text-red-200/80 transition hover:text-red-100"
+              aria-label="Dismiss notification"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

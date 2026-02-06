@@ -5,7 +5,7 @@ export const SERVICES = [
     address: "0x3cAAe16ffc210C7C398Ef5c889A35bb8D4684424",
     token: "ETH",
     amount: "0.001",
-    period: 30 * 24 * 60 * 60,
+    period: 30,
     mode: "EIP712",
     description: "AI-powered workspace assistant"
   },
