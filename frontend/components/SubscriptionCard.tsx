@@ -17,6 +17,7 @@ type SubscriptionCardProps = {
   approveDisabled?: boolean
   cancelDisabled?: boolean
   footer?: ReactNode
+  approved?: boolean
 }
 
 const badgeStyles: Record<SubscriptionCardProps['status'], string> = {
@@ -40,6 +41,7 @@ export default function SubscriptionCard({
   approveDisabled,
   cancelDisabled,
   footer,
+  approved = false,
 }: SubscriptionCardProps) {
   return (
     <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-white/0 p-5 shadow-[0_25px_70px_-35px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition hover:-translate-y-1 hover:border-white/20">
@@ -63,7 +65,7 @@ export default function SubscriptionCard({
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeStyles[status]}`}>
           {status === 'Cancelled' ? 'Cancelled' : status}
         </span>
-        {status === 'Awaiting Consent' && onApprove && (
+        {status === 'Awaiting Consent' && onApprove && !approved && (
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)] transition hover:shadow-[0_15px_40px_rgba(59,130,246,0.35)] disabled:cursor-not-allowed disabled:opacity-60"

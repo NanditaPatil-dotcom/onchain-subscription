@@ -8,7 +8,7 @@ import SubscriptionCard from '@/components/SubscriptionCard'
 import { getContract, getSigner, getProvider } from '@/lib/web3'
 import { ethers } from 'ethers'
 import { signApproval } from '@/lib/signature'
-import { SERVICES } from '@/lib/services'
+import { SERVICES, SERVICE_BY_ADDRESS } from '@/lib/services'
 
 type StatCard = {
   label: string
@@ -35,15 +35,15 @@ type ChainSub = {
   balance: ethers.BigNumber
   active: boolean
   id: number
+  approved?: boolean
 }
 
 export default function DashboardPage() {
   const [selected, setSelected] = useState<Subscription | null>(null)
   const [subs, setSubs] = useState<ChainSub[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [signature, setSignature] = useState<string | null>(null)
   const [signingIndex, setSigningIndex] = useState<number | null>(null)
-  const [claiming, setClaiming] = useState(false)
+  const [claimingId, setClaimingId] = useState<number | null>(null)
   const [signing, setSigning] = useState(false)
   const [expiryTs, setExpiryTs] = useState<number>(0)
   const [cancelingId, setCancelingId] = useState<number | null>(null)
@@ -57,37 +57,38 @@ export default function DashboardPage() {
   } | null>(null)
   const [account, setAccount] = useState<string | null>(null)
 
+  const toChainSub = useCallback((sub: any, id: number): ChainSub => ({
+    id,
+    subscriber: sub.subscriber,
+    service: sub.service,
+    amount: ethers.BigNumber.from(sub.amount ?? 0),
+    period: ethers.BigNumber.from(sub.period ?? 0),
+    lastPaid: ethers.BigNumber.from(sub.lastPaid ?? 0),
+    nonce: ethers.BigNumber.from(sub.nonce ?? 0),
+    balance: ethers.BigNumber.from(sub.balance ?? 0),
+    active: sub.active,
+    approved: false,
+  }), [])
+
   const load = useCallback(async () => {
     try {
-      try {
-        const contract = await getContract()
-        const countBN = await contract.nextSubscriptionId()
-        const count = Number(countBN.toString())
+      const contract = await getContract()
+      const countBN = await contract.nextSubscriptionId()
+      const count = Number(countBN.toString())
 
-        const data: ChainSub[] = []
-        for (let i = 0; i < count; i++) {
+      const indices = Array.from({ length: count }, (_, i) => i)
+      const data: ChainSub[] = await Promise.all(
+        indices.map(async (i) => {
           const s = await contract.subscriptions(i)
-          data.push({
-            id: i,
-            subscriber: s.subscriber,
-            service: s.service,
-            amount: ethers.BigNumber.from(s.amount ?? 0),
-            period: ethers.BigNumber.from(s.period ?? 0),
-            lastPaid: ethers.BigNumber.from(s.lastPaid ?? 0),
-            nonce: ethers.BigNumber.from(s.nonce ?? 0),
-            balance: ethers.BigNumber.from(s.balance ?? 0),
-            active: s.active,
-          })
-        }
+          return toChainSub(s, i)
+        })
+      )
 
-        setSubs(data)
-      } catch (err) {
-        console.error('Failed to load subscriptions:', err)
-      }
+      setSubs(data)
     } catch (err) {
       console.error('Failed to load subscriptions:', err)
     }
-  }, [])
+  }, [toChainSub])
 
   useEffect(() => {
     load()
@@ -120,42 +121,52 @@ export default function DashboardPage() {
 
   // derive UI cards from on-chain subs: single source of truth for UX
   const cards = useMemo(() => {
-    return subs
-      .map((sub) => {
-        const meta = SERVICES.find(
-          (svc) => svc.address.toLowerCase() === sub.service.toLowerCase(),
-        )
-        const amountFormatted = ethers.utils.formatEther(sub.amount ?? 0)
+    const approvedId = approval?.subscriptionId ?? null
+    const unsorted = subs.map((sub) => {
+      const meta = SERVICE_BY_ADDRESS[sub.service.toLowerCase()]
+      const amountFormatted = ethers.utils.formatEther(sub.amount ?? 0)
 
-        const now = Math.floor(Date.now() / 1000)
-        const due =
-          sub.active &&
-          (sub.lastPaid
-            ? now >= Number(sub.lastPaid) + Number(sub.period)
-            : true)
-        const hasFunds =
-          sub.active &&
-          ethers.BigNumber.from(sub.balance ?? 0).gte(sub.amount ?? 0)
-        const status: Subscription['status'] = sub.active
-          ? due && hasFunds
-            ? 'Awaiting Consent'
-            : 'Paid'
-          : 'Cancelled'
+      const now = Math.floor(Date.now() / 1000)
+      const due =
+        sub.active &&
+        (sub.lastPaid ? now >= Number(sub.lastPaid) + Number(sub.period) : true)
+      const hasFunds =
+        sub.active &&
+        ethers.BigNumber.from(sub.balance ?? 0).gte(sub.amount ?? 0)
+      const status: Subscription['status'] = sub.active
+        ? due && hasFunds
+          ? 'Awaiting Consent'
+          : 'Paid'
+        : 'Cancelled'
 
-        return {
-          id: sub.id,
-          service: meta?.name ?? `Service ${sub.id}`,
-          token: 'ETH' as const,
-          amount: amountFormatted,
-          cadence: `${Math.max(1, Math.round(Number(sub.period) / 86400))}-day cycle`,
-          status,
-          mode: meta?.mode ?? 'EIP712',
-          raw: sub,
-          due,
-          hasFunds,
-          hasEscrow: ethers.BigNumber.from(sub.balance ?? 0).gt(0),
-        }
-      })
+      return {
+        id: sub.id,
+        service: meta?.name ?? 'Unknown Service',
+        token: meta?.token ?? 'ETH',
+        amount: amountFormatted,
+        cadence: `${Math.max(1, Math.round(Number(sub.period) / 86400))}-day cycle`,
+        status,
+        mode: meta?.mode ?? 'EIP712',
+        approved: sub.approved || approvedId === sub.id,
+        raw: sub,
+        due,
+        hasFunds,
+        hasEscrow: ethers.BigNumber.from(sub.balance ?? 0).gt(0),
+      }
+    })
+
+    return [...unsorted].sort((a, b) => {
+      // Active before inactive
+      if (a.raw.active !== b.raw.active) return a.raw.active ? -1 : 1
+
+      // Awaiting Consent before other statuses
+      const awaitingA = a.status === 'Awaiting Consent'
+      const awaitingB = b.status === 'Awaiting Consent'
+      if (awaitingA !== awaitingB) return awaitingA ? -1 : 1
+
+      // Newer (higher id) first
+      return b.id - a.id
+    })
   }, [subs])
 
   const stats: StatCard[] = useMemo(() => {
@@ -264,6 +275,7 @@ export default function DashboardPage() {
                       period={sub.cadence}
                       status={sub.status}
                       token="ETH"
+                      approved={sub.approved}
                       onApprove={
                         sub.status === 'Awaiting Consent'
                           ? () => {
@@ -298,19 +310,23 @@ export default function DashboardPage() {
           <section className="col-span-12 lg:col-span-6 lg:pl-4 xl:pl-8">
             <div className="h-full min-h-[80vh] space-y-5 rounded-2xl border border-white/10 bg-slate-900/60 p-6 lg:p-8 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">On-chain Subscriptions</h3>
-                <p className="text-sm text-slate-400">Read-only mirror of contract state</p>
+                <h3 className="text-lg font-bold text-white">On-chain Subscriptions</h3>
               </div>
               <div className="mt-5 space-y-4">
                 {subs.length === 0 && (
                   <p className="text-sm text-slate-400">No subscriptions found.</p>
                 )}
                 {subs.map((s, i) => {
-                  const meta = SERVICES.find(
-                    (svc) => svc.address.toLowerCase() === (s.service ?? '').toLowerCase(),
-                  )
-                  const tokenSymbol = 'ETH'
+                  const meta = SERVICE_BY_ADDRESS[(s.service ?? '').toLowerCase()]
+                  const tokenSymbol = meta?.token ?? 'ETH'
                   const amountDisplay = ethers.utils.formatEther(s.amount ?? 0)
+                  const now = Math.floor(Date.now() / 1000)
+                  const isApproved = s.approved || approval?.subscriptionId === s.id
+                  const isClaimable =
+                    s.active &&
+                    isApproved &&
+                    ethers.BigNumber.from(s.balance ?? 0).gt(0) &&
+                    now >= Number(s.lastPaid ?? 0) + Number(s.period ?? 0)
                   return (
                     <div
                       key={i}
@@ -321,7 +337,7 @@ export default function DashboardPage() {
                       </span>
                       <div className="flex flex-wrap items-center gap-3 text-xs">
                         <span className="rounded-full border border-white/10 px-2 py-1 text-white">
-                          service {meta?.name ?? s.service ?? 'N/A'}
+                          service {meta?.name ?? s.service ?? 'Unknown Service'}
                         </span>
                         <span className="rounded-full border border-white/10 px-2 py-1 text-white">
                           {amountDisplay} {tokenSymbol} per period
@@ -336,6 +352,15 @@ export default function DashboardPage() {
                           lastPaid {Number(s.lastPaid ?? 0)}
                         </span>
                       </div>
+                      {isClaimable && (
+                        <button
+                          onClick={() => void handleClaim(s.id)}
+                          disabled={claimingId === s.id}
+                          className="mt-3 w-full rounded-lg border border-emerald-600/40 bg-emerald-600/20 px-4 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-600/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {claimingId === s.id ? 'Claiming...' : 'Claim payment'}
+                        </button>
+                      )}
                     </div>
                   )
                 })}
@@ -368,20 +393,6 @@ export default function DashboardPage() {
           }
           expiry={Math.max(0, expiryTs - Math.floor(Date.now() / 1000)) || 300}
         />
-        {signature && (
-          <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100 space-y-2">
-            <div>
-              Signature ready: <span className="break-all font-mono">{signature}</span>
-            </div>
-            <button
-              disabled={claiming}
-              onClick={() => void handleClaim()}
-              className="rounded-full border border-emerald-400/30 bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-50 hover:border-emerald-300/50 hover:bg-emerald-500/25 transition disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {claiming ? 'Claiming...' : 'Claim payment'}
-            </button>
-          </div>
-        )}
       </motion.div>
     </div>
   )
@@ -433,15 +444,30 @@ export default function DashboardPage() {
     try {
       const contract = await getContract(true)
 
-      await contract.createSubscription(
+      const tx = await contract.createSubscription(
         service.address,
         ethers.utils.parseEther(service.amount),
         service.period,
         { value: ethers.utils.parseEther(service.amount) },
       )
+      await tx.wait()
 
-      await load()
+      try {
+        const readContract = await getContract()
+        const nextId = await readContract.nextSubscriptionId()
+        const createdId = Number(nextId.toString()) - 1
+
+        if (createdId >= 0) {
+          const fresh = await readContract.subscriptions(createdId)
+          const createdSub = toChainSub(fresh, createdId)
+          setSubs((prev) => [createdSub, ...prev.filter((s) => s.id !== createdId)])
+        }
+      } catch (hydrateErr) {
+        console.warn('Hydration of new subscription failed, will rely on full reload', hydrateErr)
+      }
+
       setIsModalOpen(false)
+      void load()
     } catch (err) {
       console.error('Subscription creation failed:', err)
       window.alert('Subscription creation failed. Check console for details.')
@@ -491,8 +517,9 @@ export default function DashboardPage() {
         amount: payAmount,
         nonce,
       })
-
-      setSignature(sig)
+      setSubs((prev) =>
+        prev.map((s) => (s.id === subscriptionId ? { ...s, approved: true } : s)),
+      )
       setSelected(null)
       setExpiryTs(expiry)
     } catch (err) {
@@ -503,14 +530,14 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleClaim() {
-    if (!approval) {
-      window.alert('Sign first to prepare claim.')
+  async function handleClaim(subscriptionId: number) {
+    if (!approval || approval.subscriptionId !== subscriptionId) {
+      window.alert('Sign first to prepare claim for this subscription.')
       return
     }
-    const { subscriptionId, signature: sig, expiry, amount, nonce } = approval
+    const { signature: sig, expiry, amount, nonce } = approval
 
-    setClaiming(true)
+    setClaimingId(subscriptionId)
     try {
       const contract = await getContract(true)
 
@@ -524,13 +551,15 @@ export default function DashboardPage() {
       await tx.wait()
       window.alert('Payment claimed on-chain!')
       await load()
+      setSubs((prev) =>
+        prev.map((s) => (s.id === subscriptionId ? { ...s, approved: false } : s)),
+      )
       setApproval(null)
-      setSignature(null)
     } catch (err) {
       console.error('Claim failed:', err)
       window.alert('Claim failed. Check console for details.')
     } finally {
-      setClaiming(false)
+      setClaimingId(null)
     }
   }
 }
