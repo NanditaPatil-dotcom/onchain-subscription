@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import ApprovePaymentModal from '@/components/ApprovePaymentModal'
+import AddFundsModal from '@/components/AddFundsModal'
 import NewSubscriptionModal from '@/components/NewSubscriptionModal'
 import SubscriptionCard from '@/components/SubscriptionCard'
 import { getContract, getSigner, getProvider, getChainTime } from '@/lib/web3'
 import { ethers } from 'ethers'
 import { signApproval } from '@/lib/signature'
 import { SERVICES, SERVICE_BY_ADDRESS } from '@/lib/services'
+import { toast } from 'sonner'
 
 type StatCard = {
   label: string
@@ -61,6 +63,7 @@ export default function DashboardPage() {
   const [signing, setSigning] = useState(false)
   const [expiryTs, setExpiryTs] = useState<number>(0)
   const [cancelingId, setCancelingId] = useState<number | null>(null)
+  const [fundModalId, setFundModalId] = useState<number | null>(null)
   const [fundingId, setFundingId] = useState<number | null>(null)
   const [withdrawingId, setWithdrawingId] = useState<number | null>(null)
   const [approval, setApproval] = useState<{
@@ -94,6 +97,7 @@ export default function DashboardPage() {
     setSigningIndex(null)
     setClaimingId(null)
     setCancelingId(null)
+    setFundModalId(null)
     setFundingId(null)
     setWithdrawingId(null)
     setExpiryTs(0)
@@ -209,6 +213,7 @@ export default function DashboardPage() {
     const unsorted = subs.map((sub) => {
       const meta = SERVICE_BY_ADDRESS[sub.service.toLowerCase()]
       const amountFormatted = ethers.utils.formatEther(sub.amount ?? 0)
+      const escrowFormatted = ethers.utils.formatEther(sub.balance ?? 0)
 
       const chainNow = chainTime ?? 0
       const canApprovePayment =
@@ -237,6 +242,7 @@ export default function DashboardPage() {
         due: canApprovePayment,
         hasFunds,
         hasEscrow: ethers.BigNumber.from(sub.balance ?? 0).gt(0),
+        escrow: escrowFormatted,
       }
     })
 
@@ -295,6 +301,11 @@ export default function DashboardPage() {
       },
     ]
   }, [chainTime, currentAccount, subs])
+
+  const fundingSub = useMemo(
+    () => subs.find((s) => s.id === fundModalId) ?? null,
+    [fundModalId, subs],
+  )
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
@@ -367,10 +378,19 @@ export default function DashboardPage() {
                       token="ETH"
                       approved={sub.approved}
                       cancelledAt={sub.cancelledAt}
+                      escrowEth={sub.escrow}
                       onApprove={
                         sub.status === 'Awaiting Consent'
                           ? () => {
-                              if (!sub.due) return
+                            if (!sub.due) return
+                            const hasEscrow =
+                              ethers.BigNumber.from(sub.raw.balance ?? 0).gt(0)
+                              if (!hasEscrow) {
+                                toast.error('Insufficient escrow balance', {
+                                  description: 'Add funds before approving payment.',
+                                })
+                                return
+                              }
                               setSelected({
                                 service: sub.service,
                                 token: 'ETH',
@@ -391,7 +411,7 @@ export default function DashboardPage() {
                       approveDisabled={!sub.due}
                       onCancel={(id) => void cancelSubscription(id)}
                       cancelDisabled={cancelingId === sub.id}
-                      onFund={(id) => void fundSubscription(id)}
+                      onFund={(id) => setFundModalId(id)}
                       fundDisabled={fundingId === sub.id}
                       onWithdraw={(id) => void withdrawEscrow(id)}
                       hasEscrow={sub.hasEscrow}
@@ -478,6 +498,18 @@ export default function DashboardPage() {
             await handleCreateSubscription(service)
           }}
         />
+        <AddFundsModal
+          isOpen={fundModalId !== null}
+          onClose={() => setFundModalId(null)}
+          onAdd={handleAddFunds}
+          currentEscrowEth={
+            fundingSub ? ethers.utils.formatEther(fundingSub.balance ?? 0) : '0'
+          }
+          costPerPeriodEth={
+            fundingSub ? ethers.utils.formatEther(fundingSub.amount ?? 0) : '0'
+          }
+          loading={fundModalId !== null && fundingId === fundModalId}
+        />
         <ApprovePaymentModal
           open={!!selected}
           onClose={() => {
@@ -528,26 +560,23 @@ export default function DashboardPage() {
     }
   }
 
-  async function fundSubscription(subscriptionId: number) {
-    const amountStr = window.prompt('How much ETH to add? (e.g. 0.01)')
-    if (!amountStr) return
-
+  async function handleAddFunds(amountEth: string) {
+    if (fundModalId === null) throw new Error('No subscription selected.')
     try {
-      const value = ethers.utils.parseEther(amountStr)
+      const value = ethers.utils.parseEther(amountEth)
       if (value.lte(0)) {
-        window.alert('Amount must be greater than 0')
-        return
+        throw new Error('Amount must be greater than 0.')
       }
 
-      setFundingId(subscriptionId)
+      setFundingId(fundModalId)
       const contract = await getContract(true)
-      const tx = await contract.fundSubscription(subscriptionId, { value })
+      const tx = await contract.fundSubscription(fundModalId, { value })
       await tx.wait()
-      window.alert('Funds added to subscription escrow.')
       await syncChainState(currentAccount)
+      setFundModalId(null)
     } catch (err) {
       console.error('Funding failed:', err)
-      window.alert('Funding failed. Check console for details.')
+      throw err
     } finally {
       setFundingId(null)
     }
@@ -686,7 +715,9 @@ export default function DashboardPage() {
         sig
       )
       await tx.wait()
-      window.alert('Payment claimed on-chain!')
+      toast.success('Payment was successful', {
+        description: 'Funds claimed on-chain.',
+      })
       await syncChainState(currentAccount)
       setSubs((prev) =>
         prev.map((s) => (s.id === subscriptionId ? { ...s, approved: false } : s)),
@@ -830,7 +861,7 @@ function Header() {
         <button
           onClick={() => void (wallet ? handleSwitch() : handleConnect())}
           disabled={connecting}
-          className="ml-auto rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/15 disabled:opacity-60"
+          className="ml-auto rounded-full border border-white/10 bg-indigo-500/40 px-3 py-1 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/15 disabled:opacity-60"
         >
           {wallet ? 'Switch wallet' : 'Connect wallet'}
         </button>

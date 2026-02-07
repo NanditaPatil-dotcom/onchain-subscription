@@ -49,7 +49,7 @@ export function Navbar() {
           {/* Connect Wallet Button */}
           <button
             onClick={connectWallet}
-            className="px-4 py-2 rounded-full bg-purple-600 text-white text-sm font-medium hover:shadow-lg hover:shadow-purple-500/50 transition-all"
+            className="px-4 py-2 rounded-full bg-indigo-500/40 text-white text-sm font-medium hover:shadow-lg hover:shadow-purple-500/50 transition-all"
           >
             {address ? `${address.slice(0, 6)}...` : "Connect Wallet"}
           </button>

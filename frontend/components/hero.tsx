@@ -31,7 +31,7 @@ export function Hero() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a
             href="/dashboard"
-            className="px-8 py-4 rounded-full bg-purple-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/40 transition-all duration-300 transform hover:scale-105 text-center"
+            className="px-8 py-4 rounded-full bg-indigo-500/40 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/40 transition-all duration-300 transform hover:scale-105 text-center"
           >
             Launch App
           </a>

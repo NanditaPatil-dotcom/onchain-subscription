@@ -21,6 +21,7 @@ type SubscriptionCardProps = {
   footer?: ReactNode
   approved?: boolean
   cancelledAt?: number
+  escrowEth: string
 }
 
 const badgeStyles: Record<SubscriptionCardProps['status'], string> = {
@@ -48,6 +49,7 @@ export default function SubscriptionCard({
   footer,
   approved = false,
   cancelledAt,
+  escrowEth,
 }: SubscriptionCardProps) {
   const formattedCancelled =
     cancelledAt !== undefined
@@ -78,6 +80,8 @@ export default function SubscriptionCard({
         <span className="text-sm text-slate-400">{period}</span>
       </div>
 
+      <EscrowPill amount={amount} escrow={escrowEth} />
+
       <div className="relative mt-4 flex items-center justify-between gap-2">
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeStyles[status]}`}>
           {status === 'Cancelled' ? 'Cancelled' : status}
@@ -85,7 +89,7 @@ export default function SubscriptionCard({
         {status === 'Awaiting Consent' && onApprove && !approved && (
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)] transition hover:shadow-[0_15px_40px_rgba(59,130,246,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-full bg-indigo-500/40 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(79,70,229,0.35)] transition hover:shadow-[0_15px_40px_rgba(59,130,246,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={approveDisabled}
             onClick={() => onApprove()}
           >
@@ -154,5 +158,29 @@ export default function SubscriptionCard({
         </div>
       )}
     </article>
+  )
+}
+
+function EscrowPill({ amount, escrow }: { amount: string; escrow: string }) {
+  const escrowNum = parseFloat(escrow || '0')
+  const amountNum = parseFloat(amount || '0')
+
+  const variant = escrowNum === 0
+    ? 'empty'
+    : escrowNum < amountNum
+      ? 'low'
+      : 'ok'
+
+  const styles: Record<typeof variant, string> = {
+    ok: 'bg-emerald-500/10 text-emerald-100 border border-emerald-400/30',
+    low: 'bg-amber-500/10 text-amber-100 border border-amber-400/30',
+    empty: 'bg-red-500/10 text-red-100 border border-red-400/30',
+  }
+
+  return (
+    <div className={`mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${styles[variant]}`}>
+      <span className="h-2 w-2 rounded-full bg-current/80" />
+      Escrow: {escrow} ETH
+    </div>
   )
 }

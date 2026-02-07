@@ -35,13 +35,13 @@ export function HowItWorks() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="border-t border-purple-500/25 grid grid-cols-1 md:grid-cols-3 gap-6">
           {steps.map((step, idx) => (
             <div
               key={step.title}
-              className="group relative rounded-2xl border border-purple-500/25 bg-gradient-to-b from-purple-500/10 to-blue-500/5 p-8 backdrop-blur-md hover:border-purple-500/50 transition-all duration-300"
+              className="group relative rounded-2xl border border-purple-500/30 bg-gradient-to-b from-purple-600/25 via-purple-600/15 to-blue-500/10 p-8 backdrop-blur-md shadow-[0_30px_120px_-60px_rgba(124,58,237,0.55)] hover:border-purple-400/70 transition-all duration-300"
             >
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/0 via-transparent to-blue-500/0 group-hover:from-purple-500/10 group-hover:to-blue-500/10 transition-all duration-300" />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/15 via-purple-500/8 to-blue-500/12 group-hover:from-purple-500/22 group-hover:to-blue-500/16 transition-all duration-300" />
 
               <div className="relative z-10 space-y-3">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-purple-500/20 text-purple-100 text-sm font-semibold border border-purple-400/30">

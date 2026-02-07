@@ -61,7 +61,7 @@ export default function ApprovePaymentModal({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="relative w-full max-w-md p-[1px] rounded-2xl bg-purple-500 shadow-[0_25px_80px_-40px_rgba(0,0,0,0.9)]"
+            className="relative w-full max-w-md p-[1px] rounded-2xl bg-indigo-500/40 shadow-[0_25px_80px_-40px_rgba(0,0,0,0.9)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="rounded-2xl bg-slate-950/80 backdrop-blur-xl p-6 border border-white/10">
@@ -101,9 +101,9 @@ export default function ApprovePaymentModal({
                 whileHover={{ scale: 1.02, boxShadow: '0 12px 32px rgba(94,234,212,0.35)' }}
                 transition={{ duration: 0.12, ease: 'easeOut' }}
                 onClick={onSign}
-                className="mt-5 w-full rounded-xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_15px_40px_rgba(88,28,135,0.4)] transition hover:shadow-[0_18px_50px_rgba(56,189,248,0.35)] active:translate-y-[1px]"
+                className="mt-5 w-full rounded-xl bg-indigo-500/40 px-4 py-3 text-sm font-semibold text-white shadow-[0_15px_40px_rgba(88,28,135,0.4)] transition hover:shadow-[0_18px_50px_rgba(56,189,248,0.35)] active:translate-y-[1px]"
               >
-                Sign Message (No Gas)
+                Sign Message
               </motion.button>
             </div>
           </motion.div>
