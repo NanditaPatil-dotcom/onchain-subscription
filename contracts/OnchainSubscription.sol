@@ -55,6 +55,19 @@ contract OnchainSubscription is EIP712 {
         });
     }
 
+        /// @notice Add ETH to an existing subscription escrow
+    /// @param subscriptionId The ID of the subscription to fund
+    function fundSubscription(uint256 subscriptionId) external payable {
+        Subscription storage sub = subscriptions[subscriptionId];
+
+        require(sub.active, "Subscription cancelled");
+        require(msg.sender == sub.subscriber, "Not subscriber");
+        require(msg.value > 0, "No ETH sent");
+
+        sub.balance += msg.value;
+    }
+
+
     /// @notice Cancels an active subscription
     /// @param subscriptionId The ID of the subscription to cancel
     /// @dev Placeholder - no logic implemented

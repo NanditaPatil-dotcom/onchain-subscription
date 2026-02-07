@@ -61,6 +61,7 @@ export default function DashboardPage() {
   const [signing, setSigning] = useState(false)
   const [expiryTs, setExpiryTs] = useState<number>(0)
   const [cancelingId, setCancelingId] = useState<number | null>(null)
+  const [fundingId, setFundingId] = useState<number | null>(null)
   const [withdrawingId, setWithdrawingId] = useState<number | null>(null)
   const [approval, setApproval] = useState<{
     subscriptionId: number
@@ -93,6 +94,7 @@ export default function DashboardPage() {
     setSigningIndex(null)
     setClaimingId(null)
     setCancelingId(null)
+    setFundingId(null)
     setWithdrawingId(null)
     setExpiryTs(0)
   }, [])
@@ -389,6 +391,8 @@ export default function DashboardPage() {
                       approveDisabled={!sub.due}
                       onCancel={(id) => void cancelSubscription(id)}
                       cancelDisabled={cancelingId === sub.id}
+                      onFund={(id) => void fundSubscription(id)}
+                      fundDisabled={fundingId === sub.id}
                       onWithdraw={(id) => void withdrawEscrow(id)}
                       hasEscrow={sub.hasEscrow}
                       withdrawDisabled={withdrawingId === sub.id}
@@ -521,6 +525,31 @@ export default function DashboardPage() {
       window.alert('Cancel failed. Check console for details.')
     } finally {
       setCancelingId(null)
+    }
+  }
+
+  async function fundSubscription(subscriptionId: number) {
+    const amountStr = window.prompt('How much ETH to add? (e.g. 0.01)')
+    if (!amountStr) return
+
+    try {
+      const value = ethers.utils.parseEther(amountStr)
+      if (value.lte(0)) {
+        window.alert('Amount must be greater than 0')
+        return
+      }
+
+      setFundingId(subscriptionId)
+      const contract = await getContract(true)
+      const tx = await contract.fundSubscription(subscriptionId, { value })
+      await tx.wait()
+      window.alert('Funds added to subscription escrow.')
+      await syncChainState(currentAccount)
+    } catch (err) {
+      console.error('Funding failed:', err)
+      window.alert('Funding failed. Check console for details.')
+    } finally {
+      setFundingId(null)
     }
   }
 

@@ -11,11 +11,13 @@ type SubscriptionCardProps = {
   token?: string
   onApprove?: () => void
   onCancel: (subscriptionId: number) => void | Promise<void>
+  onFund?: (subscriptionId: number) => void | Promise<void>
   onWithdraw?: (subscriptionId: number) => void | Promise<void>
   hasEscrow?: boolean
   withdrawDisabled?: boolean
   approveDisabled?: boolean
   cancelDisabled?: boolean
+  fundDisabled?: boolean
   footer?: ReactNode
   approved?: boolean
   cancelledAt?: number
@@ -36,11 +38,13 @@ export default function SubscriptionCard({
   token = 'ETH',
   onApprove,
   onCancel,
+  onFund,
   onWithdraw,
   hasEscrow = false,
   withdrawDisabled,
   approveDisabled,
   cancelDisabled,
+  fundDisabled,
   footer,
   approved = false,
   cancelledAt,
@@ -104,14 +108,26 @@ export default function SubscriptionCard({
 
       <div className="relative mt-3 flex flex-wrap gap-2">
         {status !== 'Cancelled' ? (
-          <button
-            type="button"
-            onClick={() => onCancel(subscriptionId)}
-            className="mt-1 rounded-lg border border-red-500/40 text-red-400 px-4 py-2 text-sm hover:bg-red-500/10 transition"
-            disabled={cancelDisabled}
-          >
-            Cancel subscription
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => onCancel(subscriptionId)}
+              className="mt-1 rounded-lg border border-red-500/40 text-red-400 px-4 py-2 text-sm hover:bg-red-500/10 transition"
+              disabled={cancelDisabled}
+            >
+              Cancel subscription
+            </button>
+            {onFund && (
+              <button
+                type="button"
+                onClick={() => onFund(subscriptionId)}
+                className="mt-1 rounded-lg border border-indigo-400/40 bg-indigo-500/10 text-indigo-100 px-4 py-2 text-sm hover:border-indigo-300/60 hover:bg-indigo-500/15 transition"
+                disabled={fundDisabled}
+              >
+                Add funds
+              </button>
+            )}
+          </>
         ) : (
           <div className="flex flex-col gap-2">
             {hasEscrow && onWithdraw ? (

@@ -149,6 +149,19 @@ export const ONCHAIN_SUBSCRIPTION_ABI = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "subscriptionId",
+        type: "uint256",
+      },
+    ],
+    name: "fundSubscription",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "eip712Domain",
     outputs: [
