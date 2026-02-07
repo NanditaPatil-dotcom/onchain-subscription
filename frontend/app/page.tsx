@@ -6,7 +6,7 @@ import { Navbar } from '@/components/navbar'
 import { Hero } from '@/components/hero'
 import { HowItWorks } from '@/components/stats'
 import { FloatingOrbs } from '@/components/floating-orbs'
-import LiquidEther from '@/components/liquid-ether'
+import Prism from '@/components/Prism'
 import ApprovePaymentModal from '@/components/ApprovePaymentModal'
 
 export default function Home() {
@@ -14,24 +14,18 @@ export default function Home() {
 
   return (
     <div className="dark relative min-h-screen overflow-hidden">
-      {/* LiquidEther Background */}
-      <div className="absolute inset-0 z-0">
-        <LiquidEther
-          colors={['#5227FF', '#FF9FFC', '#B19EEF']}
-          mouseForce={20}
-          cursorSize={100}
-          isViscous={true}
-          viscous={30}
-          iterationsViscous={32}
-          iterationsPoisson={32}
-          resolution={0.5}
-          isBounce={false}
-          autoDemo={true}
-          autoSpeed={0.5}
-          autoIntensity={2.2}
-          takeoverDuration={0.25}
-          autoResumeDelay={3000}
-          autoRampDuration={0.6}
+      {/* Prism Background */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <Prism
+          animationType="rotate"
+          timeScale={0.5}
+          height={3.5}
+          baseWidth={5.5}
+          scale={3.6}
+          hueShift={0}
+          colorFrequency={1}
+          noise={0}
+          glow={1}
         />
       </div>
 

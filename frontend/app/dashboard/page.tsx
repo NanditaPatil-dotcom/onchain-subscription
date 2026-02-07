@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import ApprovePaymentModal from '@/components/ApprovePaymentModal'
 import NewSubscriptionModal from '@/components/NewSubscriptionModal'
 import SubscriptionCard from '@/components/SubscriptionCard'
-import { getContract, getSigner, getProvider } from '@/lib/web3'
+import { getContract, getSigner, getProvider, getChainTime } from '@/lib/web3'
 import { ethers } from 'ethers'
 import { signApproval } from '@/lib/signature'
 import { SERVICES, SERVICE_BY_ADDRESS } from '@/lib/services'
@@ -40,6 +40,18 @@ type ChainSub = {
   cancelledAt?: number
 }
 
+function formatPeriodLabel(seconds: number): string {
+  if (seconds < 60) return `${seconds} sec cycle`
+  if (seconds < 3600) return `${trim(seconds / 60)} min cycle`
+  if (seconds < 86400) return `${trim(seconds / 3600)} hr cycle`
+  return `${trim(seconds / 86400)} day cycle`
+}
+
+function trim(value: number): string {
+  const fixed = value.toFixed(2)
+  return fixed.replace(/\.0+$|0+$/, '')
+}
+
 export default function DashboardPage() {
   const [selected, setSelected] = useState<Subscription | null>(null)
   const [subs, setSubs] = useState<ChainSub[]>([])
@@ -58,6 +70,7 @@ export default function DashboardPage() {
     nonce: any
   } | null>(null)
   const [currentAccount, setCurrentAccount] = useState<string | null>(null)
+  const [chainTime, setChainTime] = useState<number | null>(null)
 
   const toChainSub = useCallback((sub: any, id: number): ChainSub => ({
     id,
@@ -84,17 +97,23 @@ export default function DashboardPage() {
     setExpiryTs(0)
   }, [])
 
-  const load = useCallback(async (wallet?: string | null) => {
+  const syncChainState = useCallback(async (wallet?: string | null) => {
     const target = (wallet ?? currentAccount)?.toLowerCase()
     if (!target) {
       setSubs([])
+      setChainTime(null)
       return
     }
     try {
-      const contract = await getContract()
+      const provider = getProvider()
+      const [contract, latestTs] = await Promise.all([
+        getContract(),
+        getChainTime(provider),
+      ])
+      setChainTime(latestTs)
+
       const countBN = await contract.nextSubscriptionId()
       const count = Number(countBN.toString())
-
       const indices = Array.from({ length: count }, (_, i) => i)
       const data: ChainSub[] = await Promise.all(
         indices.map(async (i) => {
@@ -135,6 +154,7 @@ export default function DashboardPage() {
         const signer = provider.getSigner(accounts[0])
         const addr = (await signer.getAddress())?.toLowerCase()
         setCurrentAccount(addr ?? null)
+        await syncChainState(addr ?? null)
         return addr ?? null
       } catch (err) {
         if (mounted) {
@@ -154,7 +174,7 @@ export default function DashboardPage() {
       const next = accounts[0]?.toLowerCase() ?? null
       resetWalletScopedState()
       setCurrentAccount(next)
-      await load(next)
+      await syncChainState(next)
     }
 
     window.ethereum.on('accountsChanged', handleAccounts)
@@ -163,12 +183,23 @@ export default function DashboardPage() {
       mounted = false
       window.ethereum?.removeListener('accountsChanged', handleAccounts)
     }
-  }, [load, resetWalletScopedState])
+  }, [resetWalletScopedState, syncChainState])
 
   // Re-fetch whenever the active wallet changes.
   useEffect(() => {
-    void load(currentAccount)
-  }, [currentAccount, load])
+    void syncChainState(currentAccount)
+  }, [currentAccount, syncChainState])
+
+  // Refresh on each new block to stay aligned with on-chain time.
+  useEffect(() => {
+    if (!currentAccount) return
+    const provider = getProvider()
+    const handleBlock = () => void syncChainState(currentAccount)
+    provider.on('block', handleBlock)
+    return () => {
+      provider.off('block', handleBlock)
+    }
+  }, [currentAccount, syncChainState])
 
   // derive UI cards from on-chain subs: single source of truth for UX
   const cards = useMemo(() => {
@@ -177,15 +208,15 @@ export default function DashboardPage() {
       const meta = SERVICE_BY_ADDRESS[sub.service.toLowerCase()]
       const amountFormatted = ethers.utils.formatEther(sub.amount ?? 0)
 
-      const now = Math.floor(Date.now() / 1000)
-      const due =
+      const chainNow = chainTime ?? 0
+      const canApprovePayment =
         sub.active &&
-        (sub.lastPaid ? now >= Number(sub.lastPaid) + Number(sub.period) : true)
+        chainNow >= Number(sub.lastPaid ?? 0) + Number(sub.period ?? 0)
       const hasFunds =
         sub.active &&
         ethers.BigNumber.from(sub.balance ?? 0).gte(sub.amount ?? 0)
       const status: Subscription['status'] = sub.active
-        ? due && hasFunds
+        ? canApprovePayment
           ? 'Awaiting Consent'
           : 'Paid'
         : 'Cancelled'
@@ -195,13 +226,13 @@ export default function DashboardPage() {
         service: meta?.name ?? 'Unknown Service',
         token: meta?.token ?? 'ETH',
         amount: amountFormatted,
-        cadence: `${Math.max(1, Math.round(Number(sub.period) / 86400))}-day cycle`,
+        cadence: formatPeriodLabel(Number(sub.period ?? 0)),
         status,
         mode: meta?.mode ?? 'EIP712',
         approved: sub.approved || approvedId === sub.id,
         raw: sub,
         cancelledAt: sub.cancelledAt,
-        due,
+        due: canApprovePayment,
         hasFunds,
         hasEscrow: ethers.BigNumber.from(sub.balance ?? 0).gt(0),
       }
@@ -219,7 +250,7 @@ export default function DashboardPage() {
       // Newer (higher id) first
       return b.id - a.id
     })
-  }, [subs])
+  }, [approval?.subscriptionId, chainTime, subs])
 
   const sortedOnChain = useMemo(
     () => [...subs].sort((a, b) => b.id - a.id),
@@ -238,12 +269,12 @@ export default function DashboardPage() {
       )
       .reduce((acc, s) => acc.add(s.balance ?? 0), ethers.BigNumber.from(0))
 
-    const now = Math.floor(Date.now() / 1000)
     const pendingApprovals = subs.filter((s) => {
       if (!s.active) return false
       if (!currentAccount) return false
       if ((s.subscriber ?? '').toLowerCase() !== currentAccount.toLowerCase()) return false
-      const due = now >= Number(s.lastPaid ?? 0) + Number(s.period ?? 0)
+      const chainNow = chainTime ?? 0
+      const due = chainNow >= Number(s.lastPaid ?? 0) + Number(s.period ?? 0)
       return due
     }).length
 
@@ -261,7 +292,7 @@ export default function DashboardPage() {
         value: String(pendingApprovals)
       },
     ]
-  }, [currentAccount, subs])
+  }, [chainTime, currentAccount, subs])
 
   return (
     <div className="dark relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
@@ -347,11 +378,15 @@ export default function DashboardPage() {
                                 mode: sub.mode as Subscription['mode'],
                               })
                               setSigningIndex(sub.raw.id)
-                              setExpiryTs(Math.floor(Date.now() / 1000) + 300)
+                              void (async () => {
+                                const provider = getProvider()
+                                const nowTs = chainTime ?? (await getChainTime(provider))
+                                setExpiryTs(nowTs + 300)
+                              })()
                             }
                           : undefined
                       }
-                      approveDisabled={!sub.due || !sub.hasFunds}
+                      approveDisabled={!sub.due}
                       onCancel={(id) => void cancelSubscription(id)}
                       cancelDisabled={cancelingId === sub.id}
                       onWithdraw={(id) => void withdrawEscrow(id)}
@@ -377,14 +412,14 @@ export default function DashboardPage() {
                 {sortedOnChain.map((s, i) => {
                   const meta = SERVICE_BY_ADDRESS[(s.service ?? '').toLowerCase()]
                   const tokenSymbol = meta?.token ?? 'ETH'
-                  const amountDisplay = ethers.utils.formatEther(s.amount ?? 0)
-                  const now = Math.floor(Date.now() / 1000)
+              const amountDisplay = ethers.utils.formatEther(s.amount ?? 0)
                   const isApproved = s.approved || approval?.subscriptionId === s.id
+                  const chainNow = chainTime ?? 0
                   const isClaimable =
                     s.active &&
                     isApproved &&
                     ethers.BigNumber.from(s.balance ?? 0).gt(0) &&
-                    now >= Number(s.lastPaid ?? 0) + Number(s.period ?? 0)
+                    chainNow >= Number(s.lastPaid ?? 0) + Number(s.period ?? 0)
                   const isCancelled = !s.active
                   return (
                     <div
@@ -455,7 +490,7 @@ export default function DashboardPage() {
               ? Number(subs.find((s) => s.id === signingIndex)?.nonce ?? 0)
               : 0
           }
-          expiry={Math.max(0, expiryTs - Math.floor(Date.now() / 1000)) || 300}
+          expiry={Math.max(0, expiryTs - (chainTime ?? 0)) || 300}
         />
       </motion.div>
     </div>
@@ -469,7 +504,8 @@ export default function DashboardPage() {
 
     try {
       setCancelingId(subscriptionId)
-      const cancelledAt = Math.floor(Date.now() / 1000)
+      const provider = getProvider()
+      const cancelledAt = chainTime ?? (await getChainTime(provider))
       setSubs((prev) =>
         prev.map((s) =>
           s.id === subscriptionId ? { ...s, active: false, cancelledAt } : s,
@@ -479,7 +515,7 @@ export default function DashboardPage() {
       const tx = await contract.cancelSubscription(subscriptionId)
       await tx.wait()
       window.alert('Subscription cancelled.')
-      await load()
+      await syncChainState(currentAccount)
     } catch (err) {
       console.error('Cancel failed:', err)
       window.alert('Cancel failed. Check console for details.')
@@ -500,7 +536,7 @@ export default function DashboardPage() {
       const tx = await contract.withdrawEscrow(subscriptionId)
       await tx.wait()
       window.alert('Escrow withdrawn to your wallet.')
-      await load()
+      await syncChainState(currentAccount)
     } catch (err) {
       console.error('Withdraw failed:', err)
       window.alert('Withdraw failed. Check console for details.')
@@ -537,7 +573,7 @@ export default function DashboardPage() {
       }
 
       setIsModalOpen(false)
-      void load()
+      void syncChainState(currentAccount)
     } catch (err) {
       console.error('Subscription creation failed:', err)
       window.alert('Subscription creation failed. Check console for details.')
@@ -569,7 +605,9 @@ export default function DashboardPage() {
       const balanceBN = ethers.BigNumber.from(fresh.balance ?? 0)
       const payAmount = balanceBN.gte(amountBN) ? amountBN : balanceBN
       const nonce = fresh.nonce ?? 0
-      const expiry = Math.floor(Date.now() / 1000) + 900 // absolute timestamp (15m window)
+      const provider = getProvider()
+      const nowTs = chainTime ?? (await getChainTime(provider))
+      const expiry = nowTs + 900 // absolute timestamp (15m window)
 
       const sig = await signApproval({
         signer,
@@ -620,7 +658,7 @@ export default function DashboardPage() {
       )
       await tx.wait()
       window.alert('Payment claimed on-chain!')
-      await load()
+      await syncChainState(currentAccount)
       setSubs((prev) =>
         prev.map((s) => (s.id === subscriptionId ? { ...s, approved: false } : s)),
       )

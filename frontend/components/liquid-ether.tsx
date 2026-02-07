@@ -229,16 +229,12 @@ export default function LiquidEther({
       }
       setCoords(x: number, y: number) {
         if (!this.container) return;
-        if (this.timer) window.clearTimeout(this.timer);
         const rect = this.container.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
         const nx = (x - rect.left) / rect.width;
         const ny = (y - rect.top) / rect.height;
         this.coords.set(nx * 2 - 1, -(ny * 2 - 1));
         this.mouseMoved = true;
-        this.timer = window.setTimeout(() => {
-          this.mouseMoved = false;
-        }, 100);
       }
       setNormalized(nx: number, ny: number) {
         this.coords.set(nx, ny);

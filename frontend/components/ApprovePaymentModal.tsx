@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 
@@ -28,23 +28,6 @@ export default function ApprovePaymentModal({
   expiry,
   onSign,
 }: ApprovePaymentModalProps) {
-  const [remaining, setRemaining] = useState(expiry)
-
-  // Reset timer when modal opens or expiry changes
-  useEffect(() => {
-    if (!open) return
-    setRemaining(expiry)
-  }, [open, expiry])
-
-  // Countdown effect
-  useEffect(() => {
-    if (!open) return
-    const id = window.setInterval(() => {
-      setRemaining((prev) => (prev > 0 ? prev - 1 : 0))
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [open])
-
   // Close on ESC
   useEffect(() => {
     if (!open) return
@@ -55,7 +38,7 @@ export default function ApprovePaymentModal({
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
 
-  const countdown = useMemo(() => formatSeconds(remaining), [remaining])
+  const countdown = useMemo(() => formatSeconds(expiry), [expiry])
 
   if (typeof window === 'undefined') return null
 

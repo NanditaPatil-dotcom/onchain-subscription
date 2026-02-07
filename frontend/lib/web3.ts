@@ -18,6 +18,11 @@ export async function getSigner() {
   return provider.getSigner();
 }
 
+export async function getChainTime(provider: ethers.providers.Web3Provider) {
+  const block = await provider.getBlock("latest");
+  return block.timestamp;
+}
+
 export async function getContract(withSigner = false) {
   const provider = getProvider();
   const signer = withSigner ? await getSigner() : provider;

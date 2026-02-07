@@ -47,13 +47,13 @@ export default function SubscriptionCard({
 }: SubscriptionCardProps) {
   const formattedCancelled =
     cancelledAt !== undefined
-      ? new Date(cancelledAt * 1000).toLocaleString(undefined, {
+      ? new Intl.DateTimeFormat(undefined, {
           day: '2-digit',
           month: 'short',
           year: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
-        })
+        }).format(cancelledAt * 1000)
       : null
 
   return (

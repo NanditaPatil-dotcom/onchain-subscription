@@ -45,8 +45,7 @@ export default function NewSubscriptionModal({
 
   const billingCycle = useMemo(() => {
     if (!selected) return ''
-    const days = Math.max(1, Math.round(selected.period / 86400))
-    return `${days}-day cycle`
+    return formatPeriodLabel(selected.period)
   }, [selected])
 
   if (typeof window === 'undefined') return null
@@ -287,4 +286,16 @@ function StepDot({ active }: { active: boolean }) {
       className={`h-2 w-2 rounded-full ${active ? 'bg-gradient-to-r from-purple-400 to-sky-400' : 'bg-slate-600'}`}
     />
   )
+}
+
+function formatPeriodLabel(seconds: number): string {
+  if (seconds < 60) return `${seconds} sec cycle`
+  if (seconds < 3600) return `${trim(seconds / 60)} min cycle`
+  if (seconds < 86400) return `${trim(seconds / 3600)} hr cycle`
+  return `${trim(seconds / 86400)} day cycle`
+}
+
+function trim(value: number): string {
+  const fixed = value.toFixed(2)
+  return fixed.replace(/\.0+$|0+$/, '')
 }
